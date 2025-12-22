@@ -8,7 +8,7 @@ setup(
     author="pr3ssh",
     packages=find_packages(),
     install_requires=[
-        "marshmallow==3.22.0",
+        "marshmallow==3.26.2",
         "marshmallow-mongoengine==0.31.2",
         "mongoengine==0.29.1",
         "regex==2024.11.6",
