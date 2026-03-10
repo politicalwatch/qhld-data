@@ -1,10 +1,10 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="tipi-data",
+    name="qhld-data",
     version="1.1.0",
-    description="TIPI Data",
-    url="https://github.com/politicalwatch/tipi-data",
+    description="QHLD Data",
+    url="https://github.com/politicalwatch/qhld-data",
     author="pr3ssh",
     packages=find_packages(),
     install_requires=[
