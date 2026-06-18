@@ -6,5 +6,6 @@ __pycache__/
 build/
 dist/
 tipi_data.egg-info/
+.venv
 
 .DS_Store
