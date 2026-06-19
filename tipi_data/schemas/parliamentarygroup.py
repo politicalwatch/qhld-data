@@ -1,34 +1,61 @@
-import marshmallow_mongoengine as ma
-
-from tipi_data.models.parliamentarygroup import ParliamentaryGroup
 from tipi_data.models.footprint import FootprintByParliamentaryGroup
-from tipi_data.schemas.footprint import FootprintByParliamentaryGroupSchema
+from tipi_data.schemas.base import BaseSchema, FootprintElementOut
 
 
-class ParliamentaryGroupSchema(ma.ModelSchema):
-    class Meta:
-        model = ParliamentaryGroup
+class GenderOut(BaseSchema):
+    female: int | None = None
+    male: int | None = None
 
-    footprint = ma.fields.Method("get_footprint")
-    footprint_by_topics = ma.fields.Method("get_footprint_by_topics")
 
-    def get_footprint(self, obj):
+class AgesOut(BaseSchema):
+    under35: int | None = None
+    between35and49: int | None = None
+    between50and65: int | None = None
+    over65: int | None = None
+
+
+class CompositionOut(BaseSchema):
+    deputies: int | None = None
+    gender: GenderOut | None = None
+    ages: AgesOut | None = None
+
+
+class ParliamentaryGroupSchema(BaseSchema):
+    id: str
+    name: str | None = None
+    shortname: str | None = None
+    composition: CompositionOut | None = None
+    parties: list[str] = []
+    color: str | None = None
+    footprint: float | None = None
+    footprint_by_topics: list[FootprintElementOut] = []
+
+    @classmethod
+    def from_doc(cls, obj):
         try:
-            fbd = FootprintByParliamentaryGroup.objects.get(id=obj.id)
-            fbd_serialized = FootprintByParliamentaryGroupSchema().dump(fbd)
-            return fbd_serialized["score"]
+            fbg = FootprintByParliamentaryGroup.objects.get(id=obj.id)
+            score = fbg.score
+            topics = [FootprintElementOut.model_validate(t) for t in fbg.topics]
         except Exception:
-            return 0.0
+            score = 0.0
+            topics = []
+        return cls(
+            id=obj.id,
+            name=obj.name,
+            shortname=obj.shortname,
+            composition=obj.composition,
+            parties=list(obj.parties or []),
+            color=obj.color,
+            footprint=score,
+            footprint_by_topics=topics,
+        )
 
-    def get_footprint_by_topics(self, obj):
-        try:
-            fbd = FootprintByParliamentaryGroup.objects.get(id=obj.id)
-            fbd_serialized = FootprintByParliamentaryGroupSchema().dump(fbd)
-            return fbd_serialized["topics"]
-        except Exception:
-            return list()
 
-
-class ParliamentaryGroupCompactSchema(ma.ModelSchema):
-    class Meta:
-        model = ParliamentaryGroup
+class ParliamentaryGroupCompactSchema(BaseSchema):
+    # All model fields, no footprint (no per-row query).
+    id: str
+    name: str | None = None
+    shortname: str | None = None
+    composition: CompositionOut | None = None
+    parties: list[str] = []
+    color: str | None = None

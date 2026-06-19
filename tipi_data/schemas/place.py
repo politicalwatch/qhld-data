@@ -1,8 +1,6 @@
-import marshmallow_mongoengine as ma
-
-from tipi_data.models.place import Place
+from tipi_data.schemas.base import BaseSchema
 
 
-class PlaceSchema(ma.ModelSchema):
-    class Meta:
-        model = Place
+class PlaceSchema(BaseSchema):
+    id: str
+    name: str | None = None

@@ -1,9 +1,11 @@
-import marshmallow_mongoengine as ma
-
-from tipi_data.models.video import Video
+from tipi_data.schemas.base import BaseSchema
 
 
-class VideoSchema(ma.ModelSchema):
-    class Meta:
-        model = Video
-        model_skip_values = [None]
+class VideoSchema(BaseSchema):
+    id: str
+    reference: str | None = None
+    link: str | None = None
+    session_name: str | None = None
+    speaker: str | None = None
+    type: str | None = None
+    date: int | None = None

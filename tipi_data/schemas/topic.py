@@ -1,30 +1,26 @@
-import marshmallow_mongoengine as ma
-
-from tipi_data.models.topic import Topic
+from tipi_data.schemas.base import BaseSchema
 
 
-class TagsField(ma.fields.Field):
-    def _serialize(self, value, attr, obj):
-        return [{'subtopic': v['subtopic'], 'tag': v['tag']} for v in value]
+class TopicSchema(BaseSchema):
+    # marshmallow load_only -> excluded: description, tags, public
+    id: str
+    name: str | None = None
+    shortname: str | None = None
+    knowledgebase: str | None = None
 
 
-class TopicSchema(ma.ModelSchema):
-    class Meta:
-        model = Topic
-        model_skip_values = [None]
-        model_fields_kwargs = {
-                'description': {'load_only': True},
-                'tags': {'load_only': True},
-                'public': {'load_only': True}
-                }
+class TopicTagOut(BaseSchema):
+    """Subset emitted by the old ``TagsField`` (only subtopic + tag)."""
+
+    subtopic: str | None = None
+    tag: str | None = None
 
 
-class TopicExtendedSchema(ma.ModelSchema):
-    class Meta:
-        model = Topic
-        model_skip_values = [None]
-        model_fields_kwargs = {
-            'public': {'load_only': True}
-        }
-
-    tags = TagsField(attribute="tags")
+class TopicExtendedSchema(BaseSchema):
+    # marshmallow load_only -> excluded: public
+    id: str
+    name: str | None = None
+    shortname: str | None = None
+    description: list[str] = []
+    tags: list[TopicTagOut] = []
+    knowledgebase: str | None = None

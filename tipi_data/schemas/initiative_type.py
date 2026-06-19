@@ -1,12 +1,7 @@
-import marshmallow_mongoengine as ma
-
-from tipi_data.models.initiative_type import InitiativeType
+from tipi_data.schemas.base import BaseSchema
 
 
-class InitiativeTypeSchema(ma.ModelSchema):
-    class Meta:
-        model = InitiativeType
-        model_skip_values = [None]
-        model_fields_kwargs = {
-                'group': {'load_only': True}
-            }
+class InitiativeTypeSchema(BaseSchema):
+    # NOTE: ``group`` was marshmallow ``load_only`` -> intentionally not exposed.
+    id: str
+    name: str | None = None

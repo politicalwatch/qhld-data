@@ -1,20 +1,27 @@
-import marshmallow_mongoengine as ma
+from datetime import datetime
 
-from tipi_data.models.footprint import FootprintByTopic, \
-        FootprintByDeputy, \
-        FootprintByParliamentaryGroup
+from tipi_data.schemas.base import BaseSchema, FootprintElementOut
 
 
-class FootprintByTopicSchema(ma.ModelSchema):
-    class Meta:
-        model = FootprintByTopic
+class FootprintByTopicSchema(BaseSchema):
+    id: str
+    name: str | None = None
+    deputies: list[FootprintElementOut] = []
+    parliamentarygroups: list[FootprintElementOut] = []
+    computed_at: datetime | None = None
 
 
-class FootprintByDeputySchema(ma.ModelSchema):
-    class Meta:
-        model = FootprintByDeputy
+class FootprintByDeputySchema(BaseSchema):
+    id: str
+    name: str | None = None
+    score: float | None = None
+    topics: list[FootprintElementOut] = []
+    computed_at: datetime | None = None
 
 
-class FootprintByParliamentaryGroupSchema(ma.ModelSchema):
-    class Meta:
-        model = FootprintByParliamentaryGroup
+class FootprintByParliamentaryGroupSchema(BaseSchema):
+    id: str
+    name: str | None = None
+    score: float | None = None
+    topics: list[FootprintElementOut] = []
+    computed_at: datetime | None = None

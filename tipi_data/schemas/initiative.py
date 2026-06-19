@@ -1,119 +1,135 @@
-import marshmallow_mongoengine as ma
+"""Initiative output schemas (three variants).
 
-from tipi_data.models.initiative import Initiative
+Field-set differences preserved from the old marshmallow schemas:
+- InitiativeSchema (``simple``):       no content / history / extra; ``place`` falls back to "".
+- InitiativeNoContentSchema:           has history + extra; no content; plain ``place``.
+- InitiativeExtendedSchema (``full``): has history + extra; ``content`` joined with newlines.
+
+``authors``/``deputies`` are derived from the load-only author fields; ``tagged`` is
+filtered by the knowledgebase(s) ``kb`` (a list or, preserving an existing quirk, a bare
+string -> substring match). Build via ``from_doc(doc, kb)``.
+"""
+
+from datetime import datetime
+
+from tipi_data.schemas.base import BaseSchema, TaggedOut
 
 
-class ContentField(ma.fields.Field):
-    def _serialize(self, value, attr, obj):
-        return "\n".join(value)
+def _authors(obj):
+    return list(obj.author_others or []) + list(obj.author_parliamentarygroups or [])
 
 
-class InitiativeSchema(ma.ModelSchema):
-    class Meta:
-        model = Initiative
-        model_skip_values = [None]
-        model_fields_kwargs = {
-            "author_parliamentarygroups": {"load_only": True},
-            "author_deputies": {"load_only": True},
-            "author_others": {"load_only": True},
-            "history": {"load_only": True},
-            "extra": {"load_only": True},
-            "content": {"load_only": True},
-        }
+def _tagged(obj, kb):
+    return [TaggedOut.model_validate(t) for t in obj.tagged if t.knowledgebase in kb]
 
-    authors = ma.fields.Method("get_authors")
-    deputies = ma.fields.Method("get_deputies")
-    place = ma.fields.Method(serialize="_place_serializer")
-    tagged = ma.fields.Method(serialize="_tagged_serializer")
 
-    def get_authors(self, obj):
-        return obj.author_others + obj.author_parliamentarygroups
+class InitiativeSchema(BaseSchema):
+    id: str
+    title: str | None = None
+    reference: str | None = None
+    initiative_type: str | None = None
+    initiative_type_alt: str | None = None
+    created: datetime | None = None
+    updated: datetime | None = None
+    status: str | None = None
+    url: str | None = None
+    authors: list[str] = []
+    deputies: list[str] = []
+    place: str = ""
+    tagged: list[TaggedOut] = []
 
-    def get_deputies(self, obj):
-        return obj.author_deputies
-
-    def __init__(self, *args, **kwargs):
-        if "kb" in kwargs:
-            self.kb = kwargs["kb"]
-            del kwargs["kb"]
-        else:
-            self.kb = False
-
-        super().__init__(*args, **kwargs)
-
-    def _place_serializer(self, obj):
-        return obj.place if "place" in obj else ""
-
-    def _tagged_serializer(self, obj):
-        tagged = list(
-            filter(lambda tagged: tagged.knowledgebase in self.kb, obj.tagged)
+    @classmethod
+    def from_doc(cls, obj, kb):
+        return cls(
+            id=obj.id,
+            title=obj.title,
+            reference=obj.reference,
+            initiative_type=obj.initiative_type,
+            initiative_type_alt=obj.initiative_type_alt,
+            created=obj.created,
+            updated=obj.updated,
+            status=obj.status,
+            url=obj.url,
+            authors=_authors(obj),
+            deputies=list(obj.author_deputies or []),
+            place=obj.place or "",
+            tagged=_tagged(obj, kb),
         )
-        return list(map(lambda tag_set: tag_set.serialize(), tagged))
 
 
-class InitiativeNoContentSchema(ma.ModelSchema):
-    class Meta:
-        model = Initiative
-        model_skip_values = [None]
-        model_fields_kwargs = {
-            "author_parliamentarygroups": {"load_only": True},
-            "author_deputies": {"load_only": True},
-            "author_others": {"load_only": True},
-            "content": {"load_only": True},
-        }
+class InitiativeNoContentSchema(BaseSchema):
+    id: str
+    title: str | None = None
+    reference: str | None = None
+    initiative_type: str | None = None
+    initiative_type_alt: str | None = None
+    place: str | None = None
+    created: datetime | None = None
+    updated: datetime | None = None
+    history: list[str] = []
+    status: str | None = None
+    url: str | None = None
+    extra: dict | None = None
+    authors: list[str] = []
+    deputies: list[str] = []
+    tagged: list[TaggedOut] = []
 
-    authors = ma.fields.Method("get_authors")
-    deputies = ma.fields.Method("get_deputies")
-    tagged = ma.fields.Method(serialize="_tagged_serializer")
-
-    def get_authors(self, obj):
-        return obj.author_others + obj.author_parliamentarygroups
-
-    def get_deputies(self, obj):
-        return obj.author_deputies
-
-    def __init__(self, *args, **kwargs):
-        if "kb" in kwargs:
-            self.kb = kwargs["kb"]
-            del kwargs["kb"]
-        super().__init__(*args, **kwargs)
-
-    def _tagged_serializer(self, obj):
-        tagged = list(
-            filter(lambda tagged: tagged.knowledgebase in self.kb, obj.tagged)
+    @classmethod
+    def from_doc(cls, obj, kb):
+        return cls(
+            id=obj.id,
+            title=obj.title,
+            reference=obj.reference,
+            initiative_type=obj.initiative_type,
+            initiative_type_alt=obj.initiative_type_alt,
+            place=obj.place,
+            created=obj.created,
+            updated=obj.updated,
+            history=list(obj.history or []),
+            status=obj.status,
+            url=obj.url,
+            extra=obj.extra,
+            authors=_authors(obj),
+            deputies=list(obj.author_deputies or []),
+            tagged=_tagged(obj, kb),
         )
-        return list(map(lambda tag_set: tag_set.serialize(), tagged))
 
 
-class InitiativeExtendedSchema(ma.ModelSchema):
-    class Meta:
-        model = Initiative
-        model_skip_values = [None]
-        model_fields_kwargs = {
-            "author_parliamentarygroups": {"load_only": True},
-            "author_deputies": {"load_only": True},
-            "author_others": {"load_only": True},
-        }
+class InitiativeExtendedSchema(BaseSchema):
+    id: str
+    title: str | None = None
+    reference: str | None = None
+    initiative_type: str | None = None
+    initiative_type_alt: str | None = None
+    place: str | None = None
+    created: datetime | None = None
+    updated: datetime | None = None
+    history: list[str] = []
+    status: str | None = None
+    url: str | None = None
+    content: str | None = None
+    extra: dict | None = None
+    authors: list[str] = []
+    deputies: list[str] = []
+    tagged: list[TaggedOut] = []
 
-    authors = ma.fields.Method("get_authors")
-    deputies = ma.fields.Method("get_deputies")
-    content = ContentField(attribute="content")
-    tagged = ma.fields.Method(serialize="_tagged_serializer")
-
-    def get_authors(self, obj):
-        return obj.author_others + obj.author_parliamentarygroups
-
-    def get_deputies(self, obj):
-        return obj.author_deputies
-
-    def __init__(self, *args, **kwargs):
-        if "kb" in kwargs:
-            self.kb = kwargs["kb"]
-            del kwargs["kb"]
-        super().__init__(*args, **kwargs)
-
-    def _tagged_serializer(self, obj):
-        tagged = list(
-            filter(lambda tagged: tagged.knowledgebase in self.kb, obj.tagged)
+    @classmethod
+    def from_doc(cls, obj, kb):
+        return cls(
+            id=obj.id,
+            title=obj.title,
+            reference=obj.reference,
+            initiative_type=obj.initiative_type,
+            initiative_type_alt=obj.initiative_type_alt,
+            place=obj.place,
+            created=obj.created,
+            updated=obj.updated,
+            history=list(obj.history or []),
+            status=obj.status,
+            url=obj.url,
+            content="\n".join(obj.content or []),
+            extra=obj.extra,
+            authors=_authors(obj),
+            deputies=list(obj.author_deputies or []),
+            tagged=_tagged(obj, kb),
         )
-        return list(map(lambda tag_set: tag_set.serialize(), tagged))

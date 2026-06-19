@@ -114,6 +114,12 @@ class Initiatives:
         return result.first()["created"]
 
     @staticmethod
+    def sitemap():
+        """Lightweight projection (id + updated only) for building the frontend
+        initiatives sitemap without loading full documents."""
+        return Initiative.objects().only("id", "updated")
+
+    @staticmethod
     def by_query(query):
         if "$text" in query.keys():
             return Initiative.objects(__raw__=query).order_by()
