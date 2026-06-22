@@ -19,6 +19,22 @@ class Alerts():
                 for d in db.alerts.find({"searches.validated": False})]
 
     @staticmethod
+    def get_by_email(email):
+        doc = db.alerts.find_one({"email": email})
+        return Alert.model_validate(doc) if doc is not None else None
+
+    @staticmethod
+    def get_by_id_and_search(id, hash):
+        doc = db.alerts.find_one({"_id": id, "searches.hash": hash})
+        return Alert.model_validate(doc) if doc is not None else None
+
+    @staticmethod
+    def validate_search(id, hash):
+        return db.alerts.update_one(
+            {"_id": id, "searches.hash": hash},
+            {"$set": {"searches.$.validated": True}})
+
+    @staticmethod
     def save(alert: Alert):
         return db.alerts.replace_one(
             {"_id": alert.id}, alert.to_bson(), upsert=True)

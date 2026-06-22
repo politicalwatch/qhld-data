@@ -1,4 +1,4 @@
-from tipi_data import db
+from tipi_data import DoesNotExist, db
 from tipi_data.models.parliamentarygroup import Gender, \
         Ages, \
         ParliamentaryGroupComposition, \
@@ -11,6 +11,25 @@ class ParliamentaryGroups:
     def get_all():
         return [ParliamentaryGroup.model_validate(d)
                 for d in db.parliamentarygroups.find().sort("composition.deputies", -1)]
+
+    @staticmethod
+    def get(id):
+        doc = db.parliamentarygroups.find_one({"_id": id})
+        if doc is None:
+            raise DoesNotExist(f"ParliamentaryGroup {id} does not exist")
+        return ParliamentaryGroup.model_validate(doc)
+
+    @staticmethod
+    def get_by_name(name):
+        doc = db.parliamentarygroups.find_one({"name": name})
+        if doc is None:
+            raise DoesNotExist(f"ParliamentaryGroup {name} does not exist")
+        return ParliamentaryGroup.model_validate(doc)
+
+    @staticmethod
+    def get_by_query(query):
+        return [ParliamentaryGroup.model_validate(d)
+                for d in db.parliamentarygroups.find(query).sort("composition.deputies", -1)]
 
     @staticmethod
     def get_composition(short_group):

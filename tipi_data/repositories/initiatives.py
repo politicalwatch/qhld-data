@@ -137,6 +137,21 @@ class Initiatives:
         return [Initiative.model_validate(d) for d in cursor]
 
     @staticmethod
+    def count_by_query(query):
+        return db.initiatives.count_documents(query)
+
+    @staticmethod
+    def by_query_paginated(query, limit=None, skip=None):
+        cursor = db.initiatives.find(query)
+        if "$text" not in query:
+            cursor = cursor.sort("updated", -1)
+        if skip:
+            cursor = cursor.skip(skip)
+        if limit:
+            cursor = cursor.limit(limit)
+        return [Initiative.model_validate(d) for d in cursor]
+
+    @staticmethod
     def by_reference(reference):
         return [
             Initiative.model_validate(d)

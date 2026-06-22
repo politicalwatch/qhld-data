@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from tipi_data import db
+from tipi_data import DoesNotExist, db
 from tipi_data.models.deputy import Deputy
 
 
@@ -18,6 +18,18 @@ class Deputies:
     def get_all():
         return [Deputy.model_validate(d)
                 for d in db.deputies.find().sort("name", 1)]
+
+    @staticmethod
+    def get(id):
+        doc = db.deputies.find_one({"_id": id})
+        if doc is None:
+            raise DoesNotExist(f"Deputy {id} does not exist")
+        return Deputy.model_validate(doc)
+
+    @staticmethod
+    def get_by_query(query):
+        return [Deputy.model_validate(d)
+                for d in db.deputies.find(query).sort("name", 1)]
 
     @staticmethod
     def get_total(group):
