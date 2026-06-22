@@ -1,39 +1,32 @@
 import datetime
 
-from mongoengine.queryset import queryset_manager
+from pydantic import Field
 
-from tipi_data import db
+from tipi_data.models.base import MongoModel
 
 
-class Deputy(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    name = db.StringField()
-    parliamentarygroup = db.StringField()
-    image = db.StringField()
-    email = db.EmailField()
-    web = db.URLField()
-    twitter = db.URLField()
-    facebook = db.URLField()
-    birthdate = db.DateTimeField()
-    age = db.IntField()
-    gender = db.StringField()
-    constituency = db.StringField()
-    public_position = db.ListField(db.StringField(), default=list)
-    bio = db.ListField(db.StringField(), default=list)
-    legislatures = db.ListField(db.StringField(), default=list)
-    party_logo = db.StringField()
-    party_name = db.StringField()
-    start_date = db.DateTimeField()
-    end_date = db.DateTimeField()
-    url = db.URLField()
-    active = db.BooleanField()
-    extra = db.DictField()
-
-    meta = {
-            'collection': 'deputies',
-            'ordering': ['name'],
-            'indexes': ['name']
-            }
+class Deputy(MongoModel):
+    name: str | None = None
+    parliamentarygroup: str | None = None
+    image: str | None = None
+    email: str | None = None
+    web: str | None = None
+    twitter: str | None = None
+    facebook: str | None = None
+    birthdate: datetime.datetime | None = None
+    age: int | None = None
+    gender: str | None = None
+    constituency: str | None = None
+    public_position: list[str] = Field(default_factory=list)
+    bio: list[str] = Field(default_factory=list)
+    legislatures: list[str] = Field(default_factory=list)
+    party_logo: str | None = None
+    party_name: str | None = None
+    start_date: datetime.datetime | None = None
+    end_date: datetime.datetime | None = None
+    url: str | None = None
+    active: bool | None = None
+    extra: dict = Field(default_factory=dict)
 
     def __str__(self):
         return self.name
@@ -52,7 +45,3 @@ class Deputy(db.Document):
         parts = self.name.split(',')
         name = parts[1] + ' ' + parts[0]
         return name.strip()
-
-    @queryset_manager
-    def actives(doc_cls, queryset):
-        return queryset.filter(active=True)

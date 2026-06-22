@@ -1,18 +1,18 @@
-from tipi_data import db
+from datetime import datetime
+
+from pydantic import Field
+
+from tipi_data.models.base import MongoModel
 from tipi_data.models.initiative import Tagged
 
 
-class Scanned(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    title = db.StringField()
-    excerpt = db.StringField()
-    result = db.EmbeddedDocumentListField(Tagged, default=list)
-    created = db.DateTimeField()
-    expiration = db.DateTimeField()
-    verified = db.BooleanField()
-
-    meta = {'collection': 'scanned'}
-    # TODO Add indexes https://docs.mongoengine.org/guide/defining-documents.html#indexes
+class Scanned(MongoModel):
+    title: str | None = None
+    excerpt: str | None = None
+    result: list[Tagged] = Field(default_factory=list)
+    created: datetime | None = None
+    expiration: datetime | None = None
+    verified: bool | None = None
 
     def init_tagged_kb(self, kb):
         tagged = list(filter(lambda tagged: tagged.knowledgebase == kb, self.result))

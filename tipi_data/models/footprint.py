@@ -1,47 +1,34 @@
 from datetime import datetime
 
-from tipi_data import db
+from pydantic import Field
+
+from tipi_data.models.base import DocBase, MongoModel
 
 
-class FootprintElement(db.EmbeddedDocument):
-    name = db.StringField()
-    score = db.FloatField()
+class FootprintElement(DocBase):
+    name: str | None = None
+    score: float | None = None
 
     def __str__(self):
         return f"{self.name}: {self.score}"
 
 
-class FootprintByTopic(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    name = db.StringField()
-    deputies = db.EmbeddedDocumentListField(FootprintElement)
-    parliamentarygroups = db.EmbeddedDocumentListField(FootprintElement)
-    computed_at = db.DateTimeField(default=datetime.now())
-    meta = {
-            'collection': 'footprint_by_topics',
-            'indexes': ['name']
-            }
+class FootprintByTopic(MongoModel):
+    name: str | None = None
+    deputies: list[FootprintElement] = Field(default_factory=list)
+    parliamentarygroups: list[FootprintElement] = Field(default_factory=list)
+    computed_at: datetime = Field(default_factory=datetime.now)
 
 
-class FootprintByDeputy(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    name = db.StringField()
-    score = db.FloatField()
-    topics = db.EmbeddedDocumentListField(FootprintElement)
-    computed_at = db.DateTimeField(default=datetime.now())
-    meta = {
-            'collection': 'footprint_by_deputies',
-            'indexes': ['name']
-            }
+class FootprintByDeputy(MongoModel):
+    name: str | None = None
+    score: float | None = None
+    topics: list[FootprintElement] = Field(default_factory=list)
+    computed_at: datetime = Field(default_factory=datetime.now)
 
 
-class FootprintByParliamentaryGroup(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    name = db.StringField()
-    score = db.FloatField()
-    topics = db.EmbeddedDocumentListField(FootprintElement)
-    computed_at = db.DateTimeField(default=datetime.now())
-    meta = {
-            'collection': 'footprint_by_parliamentarygroups',
-            'indexes': ['name']
-            }
+class FootprintByParliamentaryGroup(MongoModel):
+    name: str | None = None
+    score: float | None = None
+    topics: list[FootprintElement] = Field(default_factory=list)
+    computed_at: datetime = Field(default_factory=datetime.now)

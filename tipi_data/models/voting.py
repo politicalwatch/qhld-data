@@ -1,43 +1,40 @@
-from tipi_data import db
+from pydantic import Field
+
+from tipi_data.models.base import DynamicModel, DocBase
 
 
-class TotalsVotes(db.EmbeddedDocument):
-    present = db.IntField()
-    skip = db.IntField()
-    yes = db.IntField()
-    no = db.IntField()
-    abstention = db.IntField()
+class TotalsVotes(DocBase):
+    present: int | None = None
+    skip: int | None = None
+    yes: int | None = None
+    no: int | None = None
+    abstention: int | None = None
 
 
-class ByDeputy(db.EmbeddedDocument):
-    name = db.StringField()
-    seat = db.StringField()
-    group = db.StringField()
-    vote = db.StringField()
+class ByDeputy(DocBase):
+    name: str | None = None
+    seat: str | None = None
+    group: str | None = None
+    vote: str | None = None
 
 
-class GroupVote(db.EmbeddedDocument):
-    yes = db.IntField(default=0)
-    no = db.IntField(default=0)
-    abstention = db.IntField(default=0)
-    skip = db.IntField(default=0)
+class GroupVote(DocBase):
+    yes: int = 0
+    no: int = 0
+    abstention: int = 0
+    skip: int = 0
 
 
-class ByGroup(db.EmbeddedDocument):
-    name = db.StringField()
-    votes = db.EmbeddedDocumentField(GroupVote)
+class ByGroup(DocBase):
+    name: str | None = None
+    votes: GroupVote | None = None
 
 
-class Voting(db.DynamicDocument):
-    id = db.StringField(db_field='_id', primary_key=True)
-    reference = db.StringField()
-    title = db.StringField()
-    subgroup_text = db.StringField()
-    subgroup_title = db.StringField()
-
-    totals = db.EmbeddedDocumentField(TotalsVotes)
-
-    by_deputies = db.EmbeddedDocumentListField(ByDeputy, default=[])
-    by_groups = db.EmbeddedDocumentListField(ByGroup, default=[])
-
-    meta = {'collection': 'votes'}
+class Voting(DynamicModel):
+    reference: str | None = None
+    title: str | None = None
+    subgroup_text: str | None = None
+    subgroup_title: str | None = None
+    totals: TotalsVotes | None = None
+    by_deputies: list[ByDeputy] = Field(default_factory=list)
+    by_groups: list[ByGroup] = Field(default_factory=list)

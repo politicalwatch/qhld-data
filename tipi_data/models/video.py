@@ -1,13 +1,10 @@
-from tipi_data import db
+from tipi_data.models.base import MongoModel
 
 
-class Video(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    reference = db.StringField()
-    link = db.StringField()
-    session_name = db.StringField()
-    speaker = db.StringField()
-    type = db.StringField()
-    date = db.IntField()
-
-    meta = {'collection': 'videos'}
+class Video(MongoModel):
+    reference: str | None = None
+    link: str | None = None
+    session_name: str | None = None
+    speaker: str | None = None
+    type: str | None = None
+    date: int | None = None

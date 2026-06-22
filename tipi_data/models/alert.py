@@ -1,33 +1,30 @@
-from tipi_data import db
+from datetime import datetime
+
+from pydantic import Field
+
+from tipi_data.models.base import DynamicEmbeddedModel, DynamicModel, MongoModel
 
 
-class Search(db.DynamicEmbeddedDocument):
-    hash = db.StringField()
-    search = db.StringField()
-    dbsearch = db.StringField()
-    created = db.DateTimeField()
-    validated = db.BooleanField(default=False)
-    validation_email_sent = db.BooleanField()
-    validation_email_sent_date = db.DateTimeField()
+class Search(DynamicEmbeddedModel):
+    hash: str | None = None
+    search: str | None = None
+    dbsearch: str | None = None
+    created: datetime | None = None
+    validated: bool = False
+    validation_email_sent: bool | None = None
+    validation_email_sent_date: datetime | None = None
 
     def __str__(self):
         return self.hash
 
 
-class Alert(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    email = db.EmailField()
-    searches = db.EmbeddedDocumentListField(Search)
-
-    meta = {'collection': 'alerts'}
-    # TODO Add indexes https://docs.mongoengine.org/guide/defining-documents.html#indexes
+class Alert(MongoModel):
+    email: str | None = None
+    searches: list[Search] = Field(default_factory=list)
 
     def __str__(self):
         return self.email
 
 
-class InitiativeAlert(db.DynamicDocument):
-    id = db.StringField(db_field='_id', primary_key=True)
-    meta = {
-        'collection': 'initiatives_alerts'
-    }
+class InitiativeAlert(DynamicModel):
+    pass

@@ -1,37 +1,32 @@
-from tipi_data import db
+from pydantic import Field
+
+from tipi_data.models.base import DocBase, MongoModel
 
 
-class Gender(db.EmbeddedDocument):
-    female = db.IntField()
-    male = db.IntField()
+class Gender(DocBase):
+    female: int | None = None
+    male: int | None = None
 
 
-class Ages(db.EmbeddedDocument):
-    under35 = db.IntField()
-    between35and49 = db.IntField()
-    between50and65 = db.IntField()
-    over65 = db.IntField()
+class Ages(DocBase):
+    under35: int | None = None
+    between35and49: int | None = None
+    between50and65: int | None = None
+    over65: int | None = None
 
 
-class ParliamentaryGroupComposition(db.EmbeddedDocument):
-    deputies = db.IntField()
-    gender = db.EmbeddedDocumentField(Gender)
-    ages = db.EmbeddedDocumentField(Ages)
+class ParliamentaryGroupComposition(DocBase):
+    deputies: int | None = None
+    gender: Gender | None = None
+    ages: Ages | None = None
 
 
-class ParliamentaryGroup(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    name = db.StringField()
-    shortname = db.StringField()
-    composition = db.EmbeddedDocumentField(ParliamentaryGroupComposition)
-    parties = db.ListField(db.StringField(), default=list)
-    color = db.StringField()
-
-    meta = {
-            'collection': 'parliamentarygroups',
-            'ordering': ['-composition__deputies'],
-            'indexes': ['name']
-            }
+class ParliamentaryGroup(MongoModel):
+    name: str | None = None
+    shortname: str | None = None
+    composition: ParliamentaryGroupComposition | None = None
+    parties: list[str] = Field(default_factory=list)
+    color: str | None = None
 
     def __str__(self):
         return self.name

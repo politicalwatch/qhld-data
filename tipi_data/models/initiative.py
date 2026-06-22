@@ -1,11 +1,15 @@
-from tipi_data import db
+from datetime import datetime
+
+from pydantic import Field
+
+from tipi_data.models.base import DocBase, MongoModel
 
 
-class Tag(db.EmbeddedDocument):
-    topic = db.StringField()
-    subtopic = db.StringField()
-    tag = db.StringField()
-    times = db.IntField()
+class Tag(DocBase):
+    topic: str | None = None
+    subtopic: str | None = None
+    tag: str | None = None
+    times: int | None = None
 
     def __str__(self):
         return self.tag
@@ -19,9 +23,9 @@ class Tag(db.EmbeddedDocument):
         }
 
 
-class TopicAlignment(db.EmbeddedDocument):
-    topic = db.StringField()
-    percentage = db.FloatField()
+class TopicAlignment(DocBase):
+    topic: str | None = None
+    percentage: float | None = None
 
     def __str__(self):
         return f"{self.topic}: {self.percentage}%"
@@ -33,11 +37,11 @@ class TopicAlignment(db.EmbeddedDocument):
                 }
 
 
-class Tagged(db.EmbeddedDocument):
-    knowledgebase = db.StringField()
-    topics = db.ListField(db.StringField(), default=list)
-    topic_alignment = db.EmbeddedDocumentListField(TopicAlignment, default=list)
-    tags = db.EmbeddedDocumentListField(Tag, default=list)
+class Tagged(DocBase):
+    knowledgebase: str | None = None
+    topics: list[str] = Field(default_factory=list)
+    topic_alignment: list[TopicAlignment] = Field(default_factory=list)
+    tags: list[Tag] = Field(default_factory=list)
 
     def __str__(self):
         return self.knowledgebase
@@ -55,14 +59,14 @@ class Tagged(db.EmbeddedDocument):
     def remove_single_occurences(self):
         topics_counter = dict()
         for tag in self.tags:
-            if tag['topic'] in topics_counter.keys():
-                topics_counter[tag['topic']] += tag['times']
+            if tag.topic in topics_counter.keys():
+                topics_counter[tag.topic] += tag.times
             else:
-                topics_counter[tag['topic']] = tag['times']
+                topics_counter[tag.topic] = tag.times
         for key in topics_counter.keys():
             if topics_counter[key] == 1:
-                self.tags = list(filter(lambda x: x['topic'] != key, self.tags))
-        self.topics = sorted(list(set([tag['topic'] for tag in self.tags])))
+                self.tags = list(filter(lambda x: x.topic != key, self.tags))
+        self.topics = sorted(list(set([tag.topic for tag in self.tags])))
 
     def has_topics(self):
         return len(self.topics) > 0
@@ -76,37 +80,23 @@ class Tagged(db.EmbeddedDocument):
         }
 
 
-class Initiative(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    title = db.StringField()
-    reference = db.StringField()
-    initiative_type = db.StringField()
-    initiative_type_alt = db.StringField()
-    author_deputies = db.ListField(db.StringField(), default=list)
-    author_parliamentarygroups = db.ListField(db.StringField(), default=list)
-    author_others = db.ListField(db.StringField(), default=list)
-    place = db.StringField()
-    created = db.DateTimeField()
-    updated = db.DateTimeField()
-    history = db.ListField(db.StringField())
-    status = db.StringField()
-    tagged = db.EmbeddedDocumentListField(Tagged, default=list)
-    url = db.URLField()
-    content = db.ListField(db.StringField(), default=list)
-    extra = db.DictField()
-
-    meta = {
-            'collection': 'initiatives',
-            'ordering': ['-updated'],
-            'indexes': [
-                {
-                    'fields': ['$title', '$content'],
-                    'default_language': 'spanish'
-                    },
-                'reference',
-                'updated',
-                ]
-            }
+class Initiative(MongoModel):
+    title: str | None = None
+    reference: str | None = None
+    initiative_type: str | None = None
+    initiative_type_alt: str | None = None
+    author_deputies: list[str] = Field(default_factory=list)
+    author_parliamentarygroups: list[str] = Field(default_factory=list)
+    author_others: list[str] = Field(default_factory=list)
+    place: str | None = None
+    created: datetime | None = None
+    updated: datetime | None = None
+    history: list[str] = Field(default_factory=list)
+    status: str | None = None
+    tagged: list[Tagged] = Field(default_factory=list)
+    url: str | None = None
+    content: list[str] = Field(default_factory=list)
+    extra: dict = Field(default_factory=dict)
 
     def __str__(self):
         return "{} : {}".format(self.id, self.title)

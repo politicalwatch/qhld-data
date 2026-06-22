@@ -1,5 +1,5 @@
-from tipi_data import db
+from tipi_data.models.base import ObjectIdModel
 
 
-class Stats(db.DynamicDocument):
-    meta = {'collection': 'statistics'}
+class Stats(ObjectIdModel):
+    pass

@@ -1,15 +1,8 @@
-from tipi_data import db
+from tipi_data.models.base import MongoModel
 
 
-class Place(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    name = db.StringField()
-
-    meta = {
-            'collection': 'places',
-            'ordering': ['name'],
-            'indexes': ['name']
-            }
+class Place(MongoModel):
+    name: str | None = None
 
     def __str__(self):
         return self.name

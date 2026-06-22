@@ -1,12 +1,15 @@
 import hashlib
 
-from tipi_data import db
+from pydantic import Field
 
-class Tag(db.EmbeddedDocument):
-    topic = db.StringField()
-    subtopic = db.StringField()
-    tag = db.StringField()
-    times = db.IntField()
+from tipi_data.models.base import DocBase, MongoModel
+
+
+class Tag(DocBase):
+    topic: str | None = None
+    subtopic: str | None = None
+    tag: str | None = None
+    times: int | None = None
 
     def __str__(self):
         return self.tag
@@ -19,10 +22,11 @@ class Tag(db.EmbeddedDocument):
             'times': self.times
         }
 
-class Tagged(db.EmbeddedDocument):
-    knowledgebase = db.StringField()
-    topics = db.ListField(db.StringField(), default=list)
-    tags = db.EmbeddedDocumentListField(Tag, default=list)
+
+class Tagged(DocBase):
+    knowledgebase: str | None = None
+    topics: list[str] = Field(default_factory=list)
+    tags: list[Tag] = Field(default_factory=list)
 
     def __str__(self):
         return self.knowledgebase
@@ -40,14 +44,14 @@ class Tagged(db.EmbeddedDocument):
     def remove_single_occurences(self):
         topics_counter = dict()
         for tag in self.tags:
-            if tag['topic'] in topics_counter.keys():
-                topics_counter[tag['topic']] += tag['times']
+            if tag.topic in topics_counter.keys():
+                topics_counter[tag.topic] += tag.times
             else:
-                topics_counter[tag['topic']] = tag['times']
+                topics_counter[tag.topic] = tag.times
         for key in topics_counter.keys():
             if topics_counter[key] == 1:
-                self.tags = list(filter(lambda x: x['topic'] != key, self.tags))
-        self.topics = sorted(list(set([tag['topic'] for tag in self.tags])))
+                self.tags = list(filter(lambda x: x.topic != key, self.tags))
+        self.topics = sorted(list(set([tag.topic for tag in self.tags])))
 
     def has_topics(self):
         return len(self.topics) > 0
@@ -59,19 +63,19 @@ class Tagged(db.EmbeddedDocument):
             'tags': list(map(lambda tag_set: tag_set.serialize(), self.tags))
         }
 
-class Amendment(db.Document):
-    id = db.StringField(db_field='_id', primary_key=True)
-    bulletin_name = db.StringField()
-    type = db.StringField()
-    applies_to = db.StringField()
-    reference = db.StringField()
-    author_deputies = db.ListField(db.StringField(), default=list)
-    author_parliamentarygroups = db.ListField(db.StringField(), default=list)
-    justification = db.ListField(db.StringField(), default=list)
-    propossed_change = db.ListField(db.StringField(), default=list)
-    from_senate = db.BooleanField()
-    justification_tagged = db.EmbeddedDocumentListField(Tagged, default=list)
-    propossed_change_tagged = db.EmbeddedDocumentListField(Tagged, default=list)
+
+class Amendment(MongoModel):
+    bulletin_name: str | None = None
+    type: str | None = None
+    applies_to: str | None = None
+    reference: str | None = None
+    author_deputies: list[str] = Field(default_factory=list)
+    author_parliamentarygroups: list[str] = Field(default_factory=list)
+    justification: list[str] = Field(default_factory=list)
+    propossed_change: list[str] = Field(default_factory=list)
+    from_senate: bool | None = None
+    justification_tagged: list[Tagged] = Field(default_factory=list)
+    propossed_change_tagged: list[Tagged] = Field(default_factory=list)
 
     def set_id(self, id):
         self.id = self.reference + '/' + hashlib.md5(self.bulletin_name.encode()).hexdigest() + '/' + id.strip()
