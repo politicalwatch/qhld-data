@@ -1,12 +1,3 @@
-import mongoengine as db
-from mongoengine.queryset import DoesNotExist
-from . import config
+from .database import client, db, DoesNotExist, ensure_indexes
 
-
-db.connect(
-        config.MONGO_DB,
-        host=config.MONGO_HOST,
-        port=config.MONGO_PORT,
-        username=config.MONGO_USER,
-        password=config.MONGO_PASSWORD
-        )
+__all__ = ["client", "db", "DoesNotExist", "ensure_indexes"]
