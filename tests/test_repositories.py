@@ -4,7 +4,7 @@ Each test seeds the collections it needs via the ``mongo_db`` fixture, then exer
 the pymongo-backed repository methods.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -12,9 +12,11 @@ from tipi_data import DoesNotExist
 from tipi_data.models.deputy import Deputy
 from tipi_data.models.initiative import Initiative
 from tipi_data.models.topic import Topic
+from tipi_data.repositories.alerts import Alerts, InitiativeAlerts
 from tipi_data.repositories.deputies import Deputies
 from tipi_data.repositories.initiatives import Initiatives
 from tipi_data.repositories.knowledgebases import KnowledgeBases
+from tipi_data.repositories.scanned import Scanned
 from tipi_data.repositories.tags import Tags
 from tipi_data.repositories.topics import Topics
 from tipi_data.repositories.votings import Votings
@@ -144,3 +146,92 @@ def test_votings_save_roundtrip(mongo_db):
     assert voting.totals.yes == 1
     g1 = next(g for g in voting.by_groups if g.name == "G1")
     assert g1.votes.yes == 1
+
+
+# ---- Alerts -------------------------------------------------------------------------
+
+def test_alerts_get_with_unvalidated_searches(mongo_db):
+    mongo_db.alerts.insert_many([
+        {"_id": "a1", "email": "all-validated@x.es",
+         "searches": [{"hash": "h1", "validated": True}]},
+        {"_id": "a2", "email": "some-unvalidated@x.es",
+         "searches": [{"hash": "h2", "validated": False}]},
+        {"_id": "a3", "email": "mixed@x.es",
+         "searches": [{"hash": "h3", "validated": True},
+                      {"hash": "h4", "validated": False}]},
+    ])
+    ids = {a.id for a in Alerts.get_with_unvalidated_searches()}
+    assert ids == {"a2", "a3"}
+
+
+def test_alerts_save_roundtrip(mongo_db):
+    mongo_db.alerts.insert_one({
+        "_id": "a1", "email": "save@x.es",
+        "searches": [{"hash": "h1", "validated": False}]})
+
+    alert = Alerts.get_with_unvalidated_searches()[0]
+    alert.searches[0].validation_email_sent = True
+    alert.searches[0].validation_email_sent_date = datetime(2024, 1, 1)
+    Alerts.save(alert)
+
+    stored = mongo_db.alerts.find_one({"_id": "a1"})
+    assert stored["searches"][0]["validation_email_sent"] is True
+    assert stored["searches"][0]["validation_email_sent_date"] == datetime(2024, 1, 1)
+
+
+def test_alerts_remove_search_pulls_only_matching_hash(mongo_db):
+    mongo_db.alerts.insert_one({
+        "_id": "a1", "email": "pull@x.es",
+        "searches": [{"hash": "h1", "validated": False},
+                     {"hash": "h2", "validated": False}]})
+
+    Alerts.remove_search("h1")
+
+    stored = mongo_db.alerts.find_one({"_id": "a1"})
+    assert [s["hash"] for s in stored["searches"]] == ["h2"]
+
+
+def test_alerts_delete_empty(mongo_db):
+    mongo_db.alerts.insert_many([
+        {"_id": "empty", "email": "empty@x.es", "searches": []},
+        {"_id": "full", "email": "full@x.es",
+         "searches": [{"hash": "h1", "validated": True}]},
+    ])
+    Alerts.delete_empty()
+    remaining = {d["_id"] for d in mongo_db.alerts.find()}
+    assert remaining == {"full"}
+
+
+def test_initiative_alerts_by_search_excludes_fields(mongo_db):
+    mongo_db.initiatives_alerts.insert_one({
+        "_id": "i1", "title": "Title", "content": ["secret body"],
+        "tagged": [{"knowledgebase": "kb1", "topics": [], "tags": []}]})
+
+    results = InitiativeAlerts.by_search({}, "kb1", exclude_fields=["content"])
+    assert len(results) == 1
+    assert "content" not in results[0].model_dump()
+    assert results[0].title == "Title"
+
+
+# ---- Scanned ------------------------------------------------------------------------
+
+def test_scanned_delete_expired(mongo_db):
+    now = datetime(2024, 6, 1)
+    mongo_db.scanned.insert_many([
+        {"_id": "past", "expiration": now - timedelta(days=1)},
+        {"_id": "future", "expiration": now + timedelta(days=1)},
+    ])
+    Scanned.delete_expired(now)
+    remaining = {d["_id"] for d in mongo_db.scanned.find()}
+    assert remaining == {"future"}
+
+
+def test_scanned_get_unverified_since(mongo_db):
+    cutoff = datetime(2024, 6, 1)
+    mongo_db.scanned.insert_many([
+        {"_id": "recent-unverified", "created": cutoff + timedelta(days=1), "verified": False},
+        {"_id": "recent-verified", "created": cutoff + timedelta(days=1), "verified": True},
+        {"_id": "old-unverified", "created": cutoff - timedelta(days=1), "verified": False},
+    ])
+    ids = {s.id for s in Scanned.get_unverified_since(cutoff)}
+    assert ids == {"recent-unverified"}

@@ -13,6 +13,28 @@ class Alerts():
         return [Alert.model_validate(d)
                 for d in db.alerts.find({"searches.validated": True})]
 
+    @staticmethod
+    def get_with_unvalidated_searches():
+        return [Alert.model_validate(d)
+                for d in db.alerts.find({"searches.validated": False})]
+
+    @staticmethod
+    def save(alert: Alert):
+        return db.alerts.replace_one(
+            {"_id": alert.id}, alert.to_bson(), upsert=True)
+
+    @staticmethod
+    def remove_search(hash):
+        # hash is unique per search, so pulling by hash across all matching
+        # alerts is equivalent to the previous queryset-scoped pull.
+        return db.alerts.update_many(
+            {"searches.hash": hash},
+            {"$pull": {"searches": {"hash": hash}}})
+
+    @staticmethod
+    def delete_empty():
+        return db.alerts.delete_many({"searches": {"$size": 0}})
+
 
 class InitiativeAlerts():
     @staticmethod
@@ -25,11 +47,12 @@ class InitiativeAlerts():
         db.initiatives_alerts.drop()
 
     @staticmethod
-    def by_search(search, kb):
+    def by_search(search, kb, exclude_fields=None):
         query = search
         query['tagged.knowledgebase'] = kb
+        projection = {f: 0 for f in exclude_fields} if exclude_fields else None
         return [InitiativeAlert.model_validate(d)
-                for d in db.initiatives_alerts.find(query)]
+                for d in db.initiatives_alerts.find(query, projection)]
 
     @staticmethod
     def create_alert(initiative: Initiative, reason: str = ''):
