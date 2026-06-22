@@ -1,39 +1,47 @@
 from datetime import datetime
 
+from tipi_data import db
 from tipi_data.models.deputy import Deputy
+
+
+def _actives(extra=None):
+    """Filter for active deputies, optionally merged with extra criteria
+    (replaces the mongoengine ``Deputy.actives`` queryset manager)."""
+    query = {"active": True}
+    if extra:
+        query.update(extra)
+    return query
 
 
 class Deputies:
     @staticmethod
     def get_all():
-        return Deputy.objects()
+        return [Deputy.model_validate(d)
+                for d in db.deputies.find().sort("name", 1)]
 
     @staticmethod
     def get_total(group):
-        return Deputy.actives(
-                parliamentarygroup=group
-                ).count()
+        return db.deputies.count_documents(
+            _actives({"parliamentarygroup": group})
+        )
 
     @staticmethod
     def get_total_females(group):
-        return Deputy.actives(
-                parliamentarygroup=group,
-                gender='Mujer'
-                ).count()
+        return db.deputies.count_documents(
+            _actives({"parliamentarygroup": group, "gender": "Mujer"})
+        )
 
     @staticmethod
     def get_total_males(group):
-        return Deputy.actives(
-                parliamentarygroup=group,
-                gender='Hombre'
-                ).count()
+        return db.deputies.count_documents(
+            _actives({"parliamentarygroup": group, "gender": "Hombre"})
+        )
 
     @staticmethod
     def get_total_under_35(group):
-        return Deputy.actives(
-                parliamentarygroup=group,
-                age__lt=35
-                ).count()
+        return db.deputies.count_documents(
+            _actives({"parliamentarygroup": group, "age": {"$lt": 35}})
+        )
 
     @staticmethod
     def get_total_between_35_and_49(group):
@@ -45,42 +53,40 @@ class Deputies:
 
     @staticmethod
     def get_total_between_ages(group, gt, lt):
-        return Deputy.actives(
-                parliamentarygroup=group,
-                age__gte=gt,
-                age__lte=lt,
-                ).count()
+        return db.deputies.count_documents(
+            _actives({"parliamentarygroup": group, "age": {"$gte": gt, "$lte": lt}})
+        )
 
     @staticmethod
     def get_total_over_65(group):
-        return Deputy.actives(
-                parliamentarygroup=group,
-                age__gt=65
-                ).count()
+        return db.deputies.count_documents(
+            _actives({"parliamentarygroup": group, "age": {"$gt": 65}})
+        )
 
     @staticmethod
     def get_birthdays():
         pipeline = [
-                { '$addFields': {
+                {'$match': {'active': True}},
+                {'$addFields': {
                     'id': '$_id',
-                    'birthDay': { '$dayOfMonth': '$birthdate' },
-                    'birthMonth': { '$month': '$birthdate' },
-                    'todayDay': { '$dayOfMonth': datetime.today() },
-                    'todayMonth': { '$month': datetime.today() }
+                    'birthDay': {'$dayOfMonth': '$birthdate'},
+                    'birthMonth': {'$month': '$birthdate'},
+                    'todayDay': {'$dayOfMonth': datetime.today()},
+                    'todayMonth': {'$month': datetime.today()}
                     }
                  },
-                { '$match': {
+                {'$match': {
                     '$expr': {
                         '$and': [
-                            { '$eq': ['$birthDay', '$todayDay'] },
-                            { '$eq': ['$birthMonth', '$todayMonth'] }
+                            {'$eq': ['$birthDay', '$todayDay']},
+                            {'$eq': ['$birthMonth', '$todayMonth']}
                             ]
                         }
                     }
                  },
-                { '$unset': ['_id', 'birthDay', 'birthMonth', 'todayDay', 'todayMonth'] }
+                {'$unset': ['_id', 'birthDay', 'birthMonth', 'todayDay', 'todayMonth']}
                 ]
         return [
-                Deputy(**doc)
-                for doc in Deputy.actives().aggregate(*pipeline)
+                Deputy.model_validate(doc)
+                for doc in db.deputies.aggregate(pipeline)
                 ]

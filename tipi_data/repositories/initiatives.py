@@ -1,14 +1,19 @@
+from tipi_data import DoesNotExist, db
 from tipi_data.models.initiative import Initiative
 
 
 class Initiatives:
     @staticmethod
     def get(id):
-        return Initiative.objects().get(id=id)
+        doc = db.initiatives.find_one({"_id": id})
+        if doc is None:
+            raise DoesNotExist(f"Initiative {id} does not exist")
+        return Initiative.model_validate(doc)
 
     @staticmethod
     def get_all():
-        return Initiative.objects()
+        return [Initiative.model_validate(d)
+                for d in db.initiatives.find().sort("updated", -1)]
 
     @staticmethod
     def get_all_short_untagged():
@@ -108,24 +113,32 @@ class Initiatives:
                 query["author_deputies"] = entity
             if typeof == "parliamentarygroup":
                 query["author_parliamentarygroups"] = entity
-        result = Initiatives.by_query(query).fields("created").order_by("-created")
-        if not result:
+        doc = db.initiatives.find_one(
+            query, {"created": 1}, sort=[("created", -1)]
+        )
+        if not doc:
             return None
-        return result.first()["created"]
+        return doc["created"]
 
     @staticmethod
     def sitemap():
         """Lightweight projection (id + updated only) for building the frontend
         initiatives sitemap without loading full documents."""
-        return Initiative.objects().only("id", "updated")
+        return [
+            Initiative.model_validate(d)
+            for d in db.initiatives.find({}, {"_id": 1, "updated": 1}).sort("updated", -1)
+        ]
 
     @staticmethod
     def by_query(query):
-        if "$text" in query.keys():
-            return Initiative.objects(__raw__=query).order_by()
-
-        return Initiative.objects(__raw__=query)
+        cursor = db.initiatives.find(query)
+        if "$text" not in query:
+            cursor = cursor.sort("updated", -1)
+        return [Initiative.model_validate(d) for d in cursor]
 
     @staticmethod
     def by_reference(reference):
-        return Initiative.objects(reference=reference)
+        return [
+            Initiative.model_validate(d)
+            for d in db.initiatives.find({"reference": reference}).sort("updated", -1)
+        ]

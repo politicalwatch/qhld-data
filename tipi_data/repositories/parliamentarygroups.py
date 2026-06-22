@@ -1,3 +1,4 @@
+from tipi_data import db
 from tipi_data.models.parliamentarygroup import Gender, \
         Ages, \
         ParliamentaryGroupComposition, \
@@ -8,7 +9,8 @@ from tipi_data.repositories.deputies import Deputies
 class ParliamentaryGroups:
     @staticmethod
     def get_all():
-        return ParliamentaryGroup.objects()
+        return [ParliamentaryGroup.model_validate(d)
+                for d in db.parliamentarygroups.find().sort("composition.deputies", -1)]
 
     @staticmethod
     def get_composition(short_group):

@@ -1,10 +1,11 @@
-from tipi_data.models.topic import Topic
+from tipi_data import db
+
 
 class KnowledgeBases():
     @staticmethod
     def get_all():
-        return Topic.objects().distinct('knowledgebase')
+        return db.topics.distinct('knowledgebase')
 
     @staticmethod
     def get_public():
-        return Topic.objects(public=True).distinct('knowledgebase')
+        return db.topics.distinct('knowledgebase', {'public': True})

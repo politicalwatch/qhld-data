@@ -1,43 +1,53 @@
+from tipi_data import DoesNotExist, db
 from tipi_data.models.topic import Topic
+
+# Natural, case-insensitive ordering performed in MongoDB (replaces natsort):
+# numericOrdering -> "Tema 2" before "Tema 10"; strength 2 -> case-insensitive.
+# Verified to match the previous natsort(ns.IGNORECASE) output on the real topics.
+_NATURAL = {"locale": "es", "numericOrdering": True, "strength": 2}
+
+
+def _kb_query(kb):
+    if not isinstance(kb, list):
+        kb = [kb]
+    return {"knowledgebase": {"$in": kb}}
 
 
 class Topics():
     @staticmethod
     def get_all():
-        return Topic.objects()
+        return [Topic.model_validate(d) for d in db.topics.find().sort("name", 1)]
 
     @staticmethod
     def get_all_sorted():
-        return Topics.get_all().natsorted()
+        return [Topic.model_validate(d)
+                for d in db.topics.find().sort("name", 1).collation(_NATURAL)]
 
     @staticmethod
     def get_public():
-        return Topic.objects(public=True).natsorted()
+        return [Topic.model_validate(d) for d in
+                db.topics.find({"public": True}).sort("name", 1).collation(_NATURAL)]
 
     @staticmethod
     def get(id):
-        return Topic.objects.get(id=id)
+        doc = db.topics.find_one({"_id": id})
+        if doc is None:
+            raise DoesNotExist(f"Topic {id} does not exist")
+        return Topic.model_validate(doc)
 
     @staticmethod
     def by_kb(kb):
-        if not isinstance(kb, list):
-            kb = [kb]
-
-        query = {
-            'knowledgebase': {
-                '$in': kb
-            }
-        }
-        return Topic.objects(__raw__=query)
+        return [Topic.model_validate(d) for d in db.topics.find(_kb_query(kb))]
 
     @staticmethod
     def by_kb_sorted(kb):
-        return Topics.by_kb(kb).natsorted()
+        return [Topic.model_validate(d) for d in
+                db.topics.find(_kb_query(kb)).sort("name", 1).collation(_NATURAL)]
 
     @staticmethod
     def get_subtopics():
-        return Topic.objects().distinct('tags.subtopic')
+        return db.topics.distinct('tags.subtopic')
 
     @staticmethod
     def get_subtopics_by_kb(kb):
-        return Topics.by_kb(kb).distinct('tags.subtopic')
+        return db.topics.distinct('tags.subtopic', _kb_query(kb))

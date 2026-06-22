@@ -1,4 +1,4 @@
-from tipi_data.models.voting import Voting
+from tipi_data import db
 from tipi_data.models.voting import Voting, TotalsVotes, ByDeputy, GroupVote, ByGroup
 from tipi_data.repositories.parliamentarygroups import ParliamentaryGroups
 from tipi_data.utils import generate_id
@@ -7,7 +7,8 @@ from tipi_data.utils import generate_id
 class Votings():
     @staticmethod
     def get_by(reference):
-        return Voting.objects(reference=reference)
+        return [Voting.model_validate(d)
+                for d in db.votes.find({"reference": reference})]
 
     @staticmethod
     def get_totals_votes(data):
@@ -75,18 +76,17 @@ class Votings():
 
     @staticmethod
     def save(reference, data):
-        votes = Voting()
         information = data.get('informacion')
-        votes['id'] = generate_id(
-                reference,
-                information.get('textoExpediente') + '\n' + information.get('tituloSubGrupo'))
-        votes['reference'] = reference
-        votes['title'] = information.get('textoExpediente')
-        votes['subgroup_text'] = information.get('textoSubGrupo')
-        votes['subgroup_title'] = information.get('tituloSubGrupo')
-
-        votes['totals'] = Votings.get_totals_votes(data)
-        votes['by_deputies'] = Votings.get_votes_by_deputies(data)
-        votes['by_groups'] = Votings.get_votes_by_group(data)
-
-        votes.save()
+        voting = Voting(
+                id=generate_id(
+                    reference,
+                    information.get('textoExpediente') + '\n' + information.get('tituloSubGrupo')),
+                reference=reference,
+                title=information.get('textoExpediente'),
+                subgroup_text=information.get('textoSubGrupo'),
+                subgroup_title=information.get('tituloSubGrupo'),
+                totals=Votings.get_totals_votes(data),
+                by_deputies=Votings.get_votes_by_deputies(data),
+                by_groups=Votings.get_votes_by_group(data)
+                )
+        db.votes.replace_one({"_id": voting.id}, voting.to_bson(), upsert=True)

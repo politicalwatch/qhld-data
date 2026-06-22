@@ -1,3 +1,4 @@
+from tipi_data import DoesNotExist, db
 from tipi_data.models.footprint import (
     FootprintByTopic,
     FootprintByDeputy,
@@ -8,11 +9,15 @@ from tipi_data.models.footprint import (
 class Footprints:
     @staticmethod
     def get_all_topics():
-        return FootprintByTopic.objects()
+        return [FootprintByTopic.model_validate(d)
+                for d in db.footprint_by_topics.find()]
 
     @staticmethod
     def get_by_topic(topic):
-        return FootprintByTopic.objects().get(name=topic)
+        doc = db.footprint_by_topics.find_one({"name": topic})
+        if doc is None:
+            raise DoesNotExist(f"FootprintByTopic {topic} does not exist")
+        return FootprintByTopic.model_validate(doc)
 
     @staticmethod
     def get_range_by_all_topics():
@@ -95,20 +100,29 @@ class Footprints:
             },
             {"$sort": {"topic": 1}},
         ]
-        return FootprintByTopic.objects().aggregate(*pipeline)
+        return list(db.footprint_by_topics.aggregate(pipeline))
 
     @staticmethod
     def get_all_deputies():
-        return FootprintByDeputy.objects()
+        return [FootprintByDeputy.model_validate(d)
+                for d in db.footprint_by_deputies.find()]
 
     @staticmethod
     def get_by_deputy(deputy):
-        return FootprintByDeputy.objects().get(name=deputy)
+        doc = db.footprint_by_deputies.find_one({"name": deputy})
+        if doc is None:
+            raise DoesNotExist(f"FootprintByDeputy {deputy} does not exist")
+        return FootprintByDeputy.model_validate(doc)
 
     @staticmethod
     def get_all_parliamentarygroups():
-        return FootprintByParliamentaryGroup.objects()
+        return [FootprintByParliamentaryGroup.model_validate(d)
+                for d in db.footprint_by_parliamentarygroups.find()]
 
     @staticmethod
     def get_by_parliamentarygroup(parliamentarygroup):
-        return FootprintByParliamentaryGroup.objects().get(name=parliamentarygroup)
+        doc = db.footprint_by_parliamentarygroups.find_one({"name": parliamentarygroup})
+        if doc is None:
+            raise DoesNotExist(
+                f"FootprintByParliamentaryGroup {parliamentarygroup} does not exist")
+        return FootprintByParliamentaryGroup.model_validate(doc)
