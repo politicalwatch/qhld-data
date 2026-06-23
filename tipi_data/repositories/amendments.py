@@ -31,3 +31,8 @@ class Amendments:
    @staticmethod
    def by_query(query):
        return [Amendment.model_validate(d) for d in db.amendment.find(query)]
+
+   @staticmethod
+   def save(amendment):
+       return db.amendment.replace_one(
+           {"_id": amendment.id}, amendment.to_bson(), upsert=True)

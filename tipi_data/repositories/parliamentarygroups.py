@@ -27,6 +27,16 @@ class ParliamentaryGroups:
         return ParliamentaryGroup.model_validate(doc)
 
     @staticmethod
+    def get_by_shortname(shortname):
+        doc = db.parliamentarygroups.find_one({"shortname": shortname})
+        return ParliamentaryGroup.model_validate(doc) if doc is not None else None
+
+    @staticmethod
+    def save(pg):
+        return db.parliamentarygroups.replace_one(
+            {"_id": pg.id}, pg.to_bson(), upsert=True)
+
+    @staticmethod
     def get_by_query(query):
         return [ParliamentaryGroup.model_validate(d)
                 for d in db.parliamentarygroups.find(query).sort("composition.deputies", -1)]

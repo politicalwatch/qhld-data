@@ -20,6 +20,15 @@ class Deputies:
                 for d in db.deputies.find().sort("name", 1)]
 
     @staticmethod
+    def save(deputy):
+        return db.deputies.replace_one(
+            {"_id": deputy.id}, deputy.to_bson(), upsert=True)
+
+    @staticmethod
+    def distinct_parliamentarygroups():
+        return db.deputies.distinct("parliamentarygroup")
+
+    @staticmethod
     def get(id):
         doc = db.deputies.find_one({"_id": id})
         if doc is None:

@@ -13,6 +13,25 @@ class Footprints:
                 for d in db.footprint_by_topics.find()]
 
     @staticmethod
+    def save_topic(fp):
+        return db.footprint_by_topics.replace_one(
+            {"_id": fp.id}, fp.to_bson(), upsert=True)
+
+    @staticmethod
+    def save_deputy(fp):
+        return db.footprint_by_deputies.replace_one(
+            {"_id": fp.id}, fp.to_bson(), upsert=True)
+
+    @staticmethod
+    def save_parliamentarygroup(fp):
+        return db.footprint_by_parliamentarygroups.replace_one(
+            {"_id": fp.id}, fp.to_bson(), upsert=True)
+
+    @staticmethod
+    def aggregate_deputies(pipeline):
+        return list(db.footprint_by_deputies.aggregate(pipeline))
+
+    @staticmethod
     def get_by_topic(topic):
         doc = db.footprint_by_topics.find_one({"name": topic})
         if doc is None:

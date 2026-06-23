@@ -2,6 +2,20 @@ from tipi_data import DoesNotExist, db
 from tipi_data.models.initiative import Initiative
 
 
+def _kb_query(kb):
+    """Initiatives tagged for a knowledge base (with at least one topic).
+    Shared by ``by_kb``/``count_by_kb``/``aggregate_by_kb`` so the filter stays
+    in one place."""
+    return {
+        "tagged": {"$elemMatch": {"knowledgebase": kb, "topics": {"$not": {"$size": 0}}}}
+    }
+
+
+# Projection used by the reference/status finders that previously did
+# ``.only('reference', 'status')`` (the extractor also reads initiative_type_alt).
+_REFS_PROJECTION = {"reference": 1, "status": 1, "initiative_type_alt": 1}
+
+
 class Initiatives:
     @staticmethod
     def get(id):
@@ -9,6 +23,78 @@ class Initiatives:
         if doc is None:
             raise DoesNotExist(f"Initiative {id} does not exist")
         return Initiative.model_validate(doc)
+
+    @staticmethod
+    def save(initiative):
+        return db.initiatives.replace_one(
+            {"_id": initiative.id}, initiative.to_bson(), upsert=True)
+
+    @staticmethod
+    def get_one_non_answer_by_reference(reference):
+        doc = db.initiatives.find_one(
+            {"reference": reference, "initiative_type_alt": {"$ne": "Respuesta"}})
+        if doc is None:
+            raise DoesNotExist(
+                f"Initiative {reference} (non-answer) does not exist")
+        return Initiative.model_validate(doc)
+
+    @staticmethod
+    def get_answer_by_reference(reference):
+        doc = db.initiatives.find_one(
+            {"reference": reference, "initiative_type_alt": "Respuesta"})
+        if doc is None:
+            raise DoesNotExist(
+                f"Initiative {reference} (answer) does not exist")
+        return Initiative.model_validate(doc)
+
+    @staticmethod
+    def get_first_by_reference(reference):
+        doc = db.initiatives.find_one(
+            {"reference": reference}, sort=[("updated", -1)])
+        return Initiative.model_validate(doc) if doc is not None else None
+
+    @staticmethod
+    def get_by_type_refs(type_code):
+        return [
+            Initiative.model_validate(d)
+            for d in db.initiatives.find(
+                {"initiative_type": type_code}, _REFS_PROJECTION).sort("reference", 1)
+        ]
+
+    @staticmethod
+    def get_non_answers_refs():
+        return [
+            Initiative.model_validate(d)
+            for d in db.initiatives.find(
+                {"initiative_type_alt": {"$ne": "Respuesta"}}, _REFS_PROJECTION
+            ).sort("reference", 1)
+        ]
+
+    @staticmethod
+    def count_by_kb(kb):
+        return db.initiatives.count_documents(_kb_query(kb))
+
+    @staticmethod
+    def aggregate(pipeline):
+        return list(db.initiatives.aggregate(pipeline))
+
+    @staticmethod
+    def aggregate_by_kb(kb, pipeline):
+        return list(db.initiatives.aggregate([{"$match": _kb_query(kb)}] + pipeline))
+
+    @staticmethod
+    def unset_tagged_all():
+        return db.initiatives.update_many({}, {"$unset": {"tagged": 1}})
+
+    @staticmethod
+    def pull_tagged_by_kb(kb):
+        return db.initiatives.update_many(
+            {}, {"$pull": {"tagged": {"knowledgebase": kb}}})
+
+    @staticmethod
+    def unset_tagged_by_reference(reference):
+        return db.initiatives.update_many(
+            {"reference": reference}, {"$unset": {"tagged": 1}})
 
     @staticmethod
     def get_all():
@@ -52,12 +138,7 @@ class Initiatives:
 
     @staticmethod
     def by_kb(kb):
-        query = {
-            "tagged": {
-                "$elemMatch": {"knowledgebase": kb, "topics": {"$not": {"$size": 0}}}
-            }
-        }
-        return Initiatives.by_query(query)
+        return Initiatives.by_query(_kb_query(kb))
 
     @staticmethod
     def by_kb_untagged(kb):
