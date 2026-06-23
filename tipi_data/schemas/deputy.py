@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 
-from tipi_data.models.footprint import FootprintByDeputy
+from tipi_data.repositories.footprints import Footprints
 from tipi_data.schemas.base import BaseSchema, FootprintElementOut
 
 
@@ -25,15 +25,19 @@ def transform_dates(text):
     return text
 
 
-def _footprint(deputy_id):
-    """Per-deputy footprint lookup. Preserves the original N+1 behavior
-    (one query per serialized deputy); returns (score, topics)."""
-    try:
-        fbd = FootprintByDeputy.objects.get(id=deputy_id)
-        topics = [FootprintElementOut.model_validate(t) for t in fbd.topics]
-        return fbd.score, topics
-    except Exception:
+def _score_topics(fbd):
+    """Turn a ``FootprintByDeputy`` (or ``None``) into ``(score, topics)``.
+    A missing footprint (not yet computed) serializes as ``0.0`` / ``[]``."""
+    if fbd is None:
         return 0.0, []
+    topics = [FootprintElementOut.model_validate(t) for t in fbd.topics]
+    return fbd.score, topics
+
+
+def _footprint(deputy_id):
+    """Single-deputy footprint lookup (one query). Used for the single-item
+    endpoint; lists use ``DeputySchema.from_docs`` to avoid an N+1."""
+    return _score_topics(Footprints.get_by_deputy_id(deputy_id))
 
 
 class DeputySchema(BaseSchema):
@@ -53,8 +57,8 @@ class DeputySchema(BaseSchema):
     footprint_by_topics: list[FootprintElementOut] = []
 
     @classmethod
-    def from_doc(cls, obj):
-        score, topics = _footprint(obj.id)
+    def from_doc(cls, obj, footprint=None):
+        score, topics = footprint if footprint is not None else _footprint(obj.id)
         return cls(
             id=obj.id,
             name=obj.name,
@@ -69,6 +73,16 @@ class DeputySchema(BaseSchema):
             footprint=score,
             footprint_by_topics=topics,
         )
+
+    @classmethod
+    def from_docs(cls, objs):
+        """Serialize a list of deputies with a single footprint query (no N+1)."""
+        objs = list(objs)
+        footprints = Footprints.get_by_deputy_ids(o.id for o in objs)
+        return [
+            cls.from_doc(o, footprint=_score_topics(footprints.get(o.id)))
+            for o in objs
+        ]
 
 
 class DeputyExtendedSchema(BaseSchema):

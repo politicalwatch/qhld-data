@@ -1,5 +1,14 @@
-from tipi_data.models.footprint import FootprintByParliamentaryGroup
+from tipi_data.repositories.footprints import Footprints
 from tipi_data.schemas.base import BaseSchema, FootprintElementOut
+
+
+def _score_topics(fbg):
+    """Turn a ``FootprintByParliamentaryGroup`` (or ``None``) into
+    ``(score, topics)``. A missing footprint serializes as ``0.0`` / ``[]``."""
+    if fbg is None:
+        return 0.0, []
+    topics = [FootprintElementOut.model_validate(t) for t in fbg.topics]
+    return fbg.score, topics
 
 
 class GenderOut(BaseSchema):
@@ -31,14 +40,12 @@ class ParliamentaryGroupSchema(BaseSchema):
     footprint_by_topics: list[FootprintElementOut] = []
 
     @classmethod
-    def from_doc(cls, obj):
-        try:
-            fbg = FootprintByParliamentaryGroup.objects.get(id=obj.id)
-            score = fbg.score
-            topics = [FootprintElementOut.model_validate(t) for t in fbg.topics]
-        except Exception:
-            score = 0.0
-            topics = []
+    def from_doc(cls, obj, footprint=None):
+        score, topics = (
+            footprint
+            if footprint is not None
+            else _score_topics(Footprints.get_by_parliamentarygroup_id(obj.id))
+        )
         return cls(
             id=obj.id,
             name=obj.name,
@@ -49,6 +56,16 @@ class ParliamentaryGroupSchema(BaseSchema):
             footprint=score,
             footprint_by_topics=topics,
         )
+
+    @classmethod
+    def from_docs(cls, objs):
+        """Serialize a list of groups with a single footprint query (no N+1)."""
+        objs = list(objs)
+        footprints = Footprints.get_by_parliamentarygroup_ids(o.id for o in objs)
+        return [
+            cls.from_doc(o, footprint=_score_topics(footprints.get(o.id)))
+            for o in objs
+        ]
 
 
 class ParliamentaryGroupCompactSchema(BaseSchema):
