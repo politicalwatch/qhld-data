@@ -6,11 +6,15 @@ a single footprint query). They need a reachable MongoDB via the ``mongo_db``
 fixture and are skipped otherwise.
 """
 
+import pytest
+
 from tipi_data.repositories.deputies import Deputies
 from tipi_data.repositories.footprints import Footprints
 from tipi_data.repositories.parliamentarygroups import ParliamentaryGroups
 from tipi_data.schemas.deputy import DeputySchema
 from tipi_data.schemas.parliamentarygroup import ParliamentaryGroupSchema
+
+pytestmark = pytest.mark.integration
 
 
 def _seed_deputies(db):

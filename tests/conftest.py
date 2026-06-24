@@ -1,37 +1,26 @@
-"""Shared pytest fixtures.
+"""Shared, repo-wide test configuration.
 
-Model round-trip tests run without a database. Repository tests need a reachable
-MongoDB; they connect via the standard ``MONGO_*`` env vars (defaulting to a local
-``qhlddb_test`` database) and are skipped when no server is available.
+The only thing that must be set up for *every* test (unit and integration alike)
+is the MongoDB connection env — ``tipi_data`` builds its ``MongoClient`` at import
+time from the ``MONGO_*`` vars, so they have to be in place before the package is
+imported anywhere (including the model-only unit tests). The values point at a
+throwaway test database on a **fixed** host port; the integration tier
+(``tests/integration/conftest.py``) starts the matching container.
 
-``MONGO_SKIP_INDEX_INIT`` is set before importing ``tipi_data`` so that importing
-the package never blocks on a connection during DB-free test runs.
+``MONGO_SKIP_INDEX_INIT`` keeps the import-time index creation from connecting, so
+unit tests import ``tipi_data`` offline with no MongoDB.
+
+Tiers:
+- ``tests/unit`` — no infrastructure; runs anywhere (``-m unit``).
+- ``tests/integration`` — needs the throwaway Mongo; auto-skips without Docker
+  (``-m integration``).
 """
 
 import os
 
 os.environ.setdefault("MONGO_SKIP_INDEX_INIT", "1")
 os.environ.setdefault("MONGO_HOST", "localhost")
+os.environ.setdefault("MONGO_PORT", "47017")
+os.environ.setdefault("MONGO_USER", "qhld")
+os.environ.setdefault("MONGO_PASSWORD", "qhld")
 os.environ.setdefault("MONGO_DB_NAME", "qhlddb_test")
-
-import pytest
-from pymongo.errors import PyMongoError
-
-from tipi_data import client, db, ensure_indexes
-
-
-@pytest.fixture
-def mongo_db():
-    """A reachable test database, or skip the test. Drops all collections before
-    yielding so each test starts clean, and creates the declared indexes."""
-    try:
-        client.admin.command("ping")
-    except PyMongoError:
-        pytest.skip("No MongoDB reachable for repository integration tests")
-
-    for name in db.list_collection_names():
-        db.drop_collection(name)
-    ensure_indexes()
-    yield db
-    for name in db.list_collection_names():
-        db.drop_collection(name)

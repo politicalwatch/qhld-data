@@ -15,6 +15,15 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest==9.1.1",
+    "testcontainers[mongodb]==4.14.2",
+]
+
+[tool.pytest.ini_options]
+# Listed unit-first so the fast no-infra tests run before the container-backed ones.
+testpaths = ["tests/unit", "tests/integration"]
+markers = [
+    "unit: no-infra tests; run anywhere with no Mongo/Docker. Filter with `-m unit`.",
+    "integration: need a throwaway Mongo (testcontainers); auto-skip when Docker is unavailable. Filter with `-m integration`.",
 ]
 
 [build-system]

@@ -16,6 +16,8 @@ from tipi_data.models.place import Place
 from tipi_data.models.stats import Stats
 from tipi_data.models.voting import Voting
 
+pytestmark = pytest.mark.unit
+
 
 def assert_reproduces(model_cls, doc):
     """model_validate(doc).to_bson() reproduces every key/value in doc."""
