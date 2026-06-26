@@ -32,6 +32,15 @@ class DocBase(BaseModel):
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
+    def __contains__(self, key):
+        # mongoengine treated a field as "in" the document when it had a
+        # non-None value (its ``__contains__`` was ``getattr(...) is not None``).
+        # Without this, Python falls back to Pydantic's ``__iter__`` (which yields
+        # ``(name, value)`` pairs), so every ``'field' in doc`` check silently
+        # returns False -- the cause of the extractor regenerating the whole
+        # corpus instead of the daily delta.
+        return getattr(self, key, None) is not None
+
     def get(self, key, default=None):
         return getattr(self, key, default)
 

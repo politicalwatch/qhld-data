@@ -46,6 +46,32 @@ def test_dict_and_attribute_access():
     assert place.get("missing", "def") == "def"
 
 
+def test_membership_matches_mongoengine_semantics():
+    # Regression: without __contains__, `in` falls back to Pydantic's __iter__
+    # (which yields (name, value) pairs), so EVERY `'field' in doc` check
+    # silently returned False. That made the spain extractor skip every existing
+    # initiative and regenerate the whole corpus (61k refs) instead of the
+    # daily delta. mongoengine's __contains__ was `getattr(...) is not None`.
+    init = Initiative.model_validate(
+        {"_id": "init-1", "reference": "161/000123", "status": "open"}
+    )
+    assert "reference" in init            # present, non-None -> True
+    assert ("reference" not in init) is False  # the exact check the extractor runs
+    assert "status" in init
+    assert "title" not in init            # declared but unset (None) -> False
+    assert "nope" not in init             # undeclared name -> False
+
+
+def test_membership_keeps_falsy_non_none_values():
+    # A present-but-falsy value is still "in" the document (mongoengine parity):
+    # only None/absent counts as missing.
+    init = Initiative.model_validate(
+        {"_id": "i", "reference": "1/000001", "content": [], "author_deputies": []}
+    )
+    assert "content" in init              # [] is not None -> True
+    assert "author_deputies" in init
+
+
 def test_construct_by_field_name():
     # populate_by_name lets code construct with `id=` instead of `_id`
     place = Place(id="p2", name="N")
