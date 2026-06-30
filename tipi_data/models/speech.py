@@ -6,6 +6,7 @@ class Speech(MongoModel):
     speaker: str | None = None
     speaker_surname: str | None = None
     group: str | None = None
+    role: str | None = None
     order: int | None = None
     legislature: str | None = None
     date: int | None = None

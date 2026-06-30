@@ -159,6 +159,7 @@ def test_speech_roundtrip():
         "speaker": "Apellido, Nombre",
         "speaker_surname": "Apellido",
         "group": "Grupo Parlamentario",
+        "role": "Diputado",
         "order": 3,
         "legislature": "15",
         "date": 20240115,
