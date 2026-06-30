@@ -20,6 +20,7 @@ from tipi_data.models.footprint import (
 from tipi_data.models.initiative import Initiative
 from tipi_data.models.parliamentarygroup import ParliamentaryGroup
 from tipi_data.models.place import Place
+from tipi_data.models.speech import Speech
 from tipi_data.models.stats import Stats as StatsModel
 from tipi_data.models.topic import Topic
 from tipi_data.models.video import Video
@@ -33,6 +34,7 @@ from tipi_data.repositories.knowledgebases import KnowledgeBases
 from tipi_data.repositories.parliamentarygroups import ParliamentaryGroups
 from tipi_data.repositories.places import Places
 from tipi_data.repositories.scanned import Scanned
+from tipi_data.repositories.speeches import Speeches
 from tipi_data.repositories.stats import Stats
 from tipi_data.repositories.tags import Tags
 from tipi_data.repositories.topics import Topics
@@ -500,3 +502,19 @@ def test_videos_save_roundtrip_and_upsert(mongo_db):
     Videos.save(Video(_id="v1", reference="R1", link="http://new", date=20240101))
     assert mongo_db.videos.count_documents({}) == 1
     assert mongo_db.videos.find_one({"_id": "v1"})["link"] == "http://new"
+
+
+# ---- Speeches -----------------------------------------------------------------------
+
+def test_speeches_save_roundtrip_and_upsert(mongo_db):
+    Speeches.save(Speech(_id="sp1", reference="R1", speaker="Apellido, Nombre",
+                         order=1, speech="old text"))
+    stored = mongo_db.speeches.find_one({"_id": "sp1"})
+    assert stored["speech"] == "old text"
+    assert stored["reference"] == "R1"
+
+    # save again with the same id updates in place (upsert), not duplicates
+    Speeches.save(Speech(_id="sp1", reference="R1", speaker="Apellido, Nombre",
+                         order=1, speech="new text"))
+    assert mongo_db.speeches.count_documents({}) == 1
+    assert mongo_db.speeches.find_one({"_id": "sp1"})["speech"] == "new text"

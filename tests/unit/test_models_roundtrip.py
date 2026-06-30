@@ -13,6 +13,7 @@ from tipi_data.models.deputy import Deputy
 from tipi_data.models.footprint import FootprintByTopic
 from tipi_data.models.initiative import Initiative
 from tipi_data.models.place import Place
+from tipi_data.models.speech import Speech
 from tipi_data.models.stats import Stats
 from tipi_data.models.voting import Voting
 
@@ -149,3 +150,23 @@ def test_footprint_computed_at_is_per_instance():
     # import) bug -> default_factory now runs per instance.
     fp = FootprintByTopic(id="f1", name="topic")
     assert isinstance(fp.computed_at, datetime)
+
+
+def test_speech_roundtrip():
+    doc = {
+        "_id": "sp-1",
+        "reference": "161/000123",
+        "speaker": "Apellido, Nombre",
+        "speaker_surname": "Apellido",
+        "group": "Grupo Parlamentario",
+        "order": 3,
+        "legislature": "15",
+        "date": 20240115,
+        "session_name": "Sesión plenaria",
+        "video_link": "http://video/x.mp4",
+        "session_link": "/public_oficiales/L15/CONG-1",
+        "speech": "Señorías, ...",
+    }
+    dumped = assert_reproduces(Speech, doc)
+    assert dumped["_id"] == "sp-1"
+    assert "id" not in dumped  # dumped by alias only

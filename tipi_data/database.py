@@ -49,6 +49,7 @@ _INDEXES = {
     "footprint_by_topics": [([("name", ASCENDING)], {})],
     "footprint_by_deputies": [([("name", ASCENDING)], {})],
     "footprint_by_parliamentarygroups": [([("name", ASCENDING)], {})],
+    "speeches": [([("reference", ASCENDING)], {})],
 }
 
 
