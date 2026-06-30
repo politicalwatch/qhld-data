@@ -19,6 +19,7 @@ class SpeechText(BaseModel):
 
 class Speech(MongoModel):
     reference: str | None = None
+    session_id: str | None = None
     speaker: str | None = None
     speaker_surname: str | None = None
     group: str | None = None

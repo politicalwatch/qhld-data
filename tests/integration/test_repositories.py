@@ -20,6 +20,7 @@ from tipi_data.models.footprint import (
 from tipi_data.models.initiative import Initiative
 from tipi_data.models.parliamentarygroup import ParliamentaryGroup
 from tipi_data.models.place import Place
+from tipi_data.models.session import Session
 from tipi_data.models.speech import Speech
 from tipi_data.models.stats import Stats as StatsModel
 from tipi_data.models.topic import Topic
@@ -34,6 +35,7 @@ from tipi_data.repositories.knowledgebases import KnowledgeBases
 from tipi_data.repositories.parliamentarygroups import ParliamentaryGroups
 from tipi_data.repositories.places import Places
 from tipi_data.repositories.scanned import Scanned
+from tipi_data.repositories.sessions import Sessions
 from tipi_data.repositories.speeches import Speeches
 from tipi_data.repositories.stats import Stats
 from tipi_data.repositories.tags import Tags
@@ -507,14 +509,41 @@ def test_videos_save_roundtrip_and_upsert(mongo_db):
 # ---- Speeches -----------------------------------------------------------------------
 
 def test_speeches_save_roundtrip_and_upsert(mongo_db):
-    Speeches.save(Speech(_id="sp1", reference="R1", speaker="Apellido, Nombre",
-                         order=1, speech="old text"))
+    Speeches.save(Speech(_id="sp1", reference="R1", session_id="sess1",
+                         speaker="Apellido, Nombre", order=1,
+                         speech=[{"lang": "es", "text": "old text", "original": True}]))
     stored = mongo_db.speeches.find_one({"_id": "sp1"})
-    assert stored["speech"] == "old text"
+    assert stored["speech"][0]["text"] == "old text"
     assert stored["reference"] == "R1"
+    assert stored["session_id"] == "sess1"
 
     # save again with the same id updates in place (upsert), not duplicates
-    Speeches.save(Speech(_id="sp1", reference="R1", speaker="Apellido, Nombre",
-                         order=1, speech="new text"))
+    Speeches.save(Speech(_id="sp1", reference="R1", session_id="sess1",
+                         speaker="Apellido, Nombre", order=1,
+                         speech=[{"lang": "es", "text": "new text", "original": True}]))
     assert mongo_db.speeches.count_documents({}) == 1
-    assert mongo_db.speeches.find_one({"_id": "sp1"})["speech"] == "new text"
+    assert mongo_db.speeches.find_one({"_id": "sp1"})["speech"][0]["text"] == "new text"
+
+
+# ---- Sessions -----------------------------------------------------------------------
+
+def test_sessions_save_upsert_accumulates_references(mongo_db):
+    # First debate of the sitting extracted.
+    Sessions.save(Session(_id="sess1", legislature="15", name="Pleno",
+                          code="DSCD-15-PL-13", congress_session_id="12",
+                          date=20231213, video_link="http://video/full.mp4",
+                          references=["172/000001"]))
+    stored = mongo_db.sessions.find_one({"_id": "sess1"})
+    assert stored["references"] == ["172/000001"]
+    assert stored["video_link"] == "http://video/full.mp4"
+
+    # A second debate of the SAME sitting: one doc, roster accumulates (not clobbered),
+    # metadata is refreshed.
+    Sessions.save(Session(_id="sess1", legislature="15", name="Pleno",
+                          code="DSCD-15-PL-13", congress_session_id="12",
+                          date=20231213, video_link="http://video/full.mp4",
+                          references=["172/000005"]))
+    assert mongo_db.sessions.count_documents({}) == 1
+    stored = mongo_db.sessions.find_one({"_id": "sess1"})
+    assert sorted(stored["references"]) == ["172/000001", "172/000005"]
+    assert stored["congress_session_id"] == "12"

@@ -13,6 +13,7 @@ from tipi_data.models.deputy import Deputy
 from tipi_data.models.footprint import FootprintByTopic
 from tipi_data.models.initiative import Initiative
 from tipi_data.models.place import Place
+from tipi_data.models.session import Session
 from tipi_data.models.speech import Speech
 from tipi_data.models.stats import Stats
 from tipi_data.models.voting import Voting
@@ -156,6 +157,7 @@ def test_speech_roundtrip():
     doc = {
         "_id": "sp-1",
         "reference": "161/000123",
+        "session_id": "sess-1",
         "speaker": "Apellido, Nombre",
         "speaker_surname": "Apellido",
         "group": "Grupo Parlamentario",
@@ -166,8 +168,29 @@ def test_speech_roundtrip():
         "session_name": "Sesión plenaria",
         "video_link": "http://video/x.mp4",
         "session_link": "/public_oficiales/L15/CONG-1",
-        "speech": "Señorías, ...",
+        "speech": [
+            {"lang": "gl", "text": "Grazas, señora presidenta.", "original": True},
+            {"lang": "es", "text": "Gracias, señora presidenta.", "original": False},
+        ],
+        "original_language": "gl",
     }
     dumped = assert_reproduces(Speech, doc)
     assert dumped["_id"] == "sp-1"
+    assert "id" not in dumped  # dumped by alias only
+
+
+def test_session_roundtrip():
+    doc = {
+        "_id": "sess-1",
+        "legislature": "15",
+        "session_link": "/public_oficiales/L15/CONG/DS/PL/DSCD-15-PL-13.PDF",
+        "name": "Pleno",
+        "code": "DSCD-15-PL-13",
+        "congress_session_id": "12",
+        "date": 20231213,
+        "video_link": "http://video/full-session.mp4",
+        "references": ["172/000001", "172/000005"],
+    }
+    dumped = assert_reproduces(Session, doc)
+    assert dumped["_id"] == "sess-1"
     assert "id" not in dumped  # dumped by alias only
