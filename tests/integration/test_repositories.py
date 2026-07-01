@@ -525,6 +525,20 @@ def test_speeches_save_roundtrip_and_upsert(mongo_db):
     assert mongo_db.speeches.find_one({"_id": "sp1"})["speech"][0]["text"] == "new text"
 
 
+def test_speeches_read_methods(mongo_db):
+    Speeches.save(Speech(_id="sp1", reference="R1", order=1,
+                         speech=[{"lang": "es", "text": "a", "original": True}]))
+    Speeches.save(Speech(_id="sp2", reference="R2", order=1,
+                         speech=[{"lang": "es", "text": "b", "original": True}]))
+
+    assert Speeches.get("sp1").reference == "R1"
+    assert {s.id for s in Speeches.all()} == {"sp1", "sp2"}
+    assert [s.id for s in Speeches.by_references(["R2"])] == ["sp2"]
+
+    with pytest.raises(DoesNotExist):
+        Speeches.get("missing")
+
+
 # ---- Sessions -----------------------------------------------------------------------
 
 def test_sessions_save_upsert_accumulates_references(mongo_db):
