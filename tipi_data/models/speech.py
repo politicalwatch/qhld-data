@@ -17,6 +17,22 @@ class SpeechText(BaseModel):
     original: bool
 
 
+class Mention(BaseModel):
+    """A person named *within* a speech (not the speaker). Extracted at index time
+    by NER over the Spanish text block and resolved against the deputies catalog.
+
+    ``deputy_id`` is the canonical ``Deputy._id`` when the mention resolved to a
+    known deputy; it is left ``None`` (reserved) for a future phase that also keeps
+    unresolved figures (ministers who are not deputies, the King, foreign leaders).
+    ``surface_forms`` collects the distinct raw spans that resolved to this person
+    (e.g. ``"Sánchez"``, ``"Pedro Sánchez"``); ``count`` is their total occurrences."""
+
+    deputy_id: str | None = None
+    name: str
+    surface_forms: list[str] = []
+    count: int = 0
+
+
 class Speech(MongoModel):
     reference: str | None = None
     session_id: str | None = None
@@ -32,3 +48,4 @@ class Speech(MongoModel):
     session_link: str | None = None
     speech: list[SpeechText] = []
     original_language: str | None = None
+    mentions: list[Mention] = []
