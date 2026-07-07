@@ -173,10 +173,18 @@ def test_speech_roundtrip():
             {"lang": "es", "text": "Gracias, señora presidenta.", "original": False},
         ],
         "original_language": "gl",
+        "mentions": [
+            {"person_id": "nunez-feijoo-alberto", "person_type": "deputy",
+             "name": "Núñez Feijóo, Alberto", "surface_forms": ["Feijóo"], "count": 2},
+            {"person_id": "isabel-diaz-ayuso", "person_type": "regional_president",
+             "name": "Díaz Ayuso, Isabel", "surface_forms": ["Ayuso"], "count": 1},
+        ],
     }
     dumped = assert_reproduces(Speech, doc)
     assert dumped["_id"] == "sp-1"
     assert "id" not in dumped  # dumped by alias only
+    assert dumped["mentions"][0]["person_type"] == "deputy"
+    assert dumped["mentions"][1]["person_id"] == "isabel-diaz-ayuso"
 
 
 def test_session_roundtrip():

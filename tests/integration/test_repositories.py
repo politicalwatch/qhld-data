@@ -539,6 +539,33 @@ def test_speeches_read_methods(mongo_db):
         Speeches.get("missing")
 
 
+def test_speeches_distinct_nondeputy_speakers(mongo_db):
+    # A minister (no group) and a witness (no group) are non-deputy speakers; a
+    # deputy (has a group) and a group-less "Diputado" quirk are excluded.
+    Speeches.save(Speech(_id="s1", reference="R1", order=1, group=None,
+                         speaker="Saiz Delgado, Elma",
+                         role="Ministra de Inclusión, Seguridad Social y Migraciones"))
+    Speeches.save(Speech(_id="s2", reference="R1", order=2, group=None,
+                         speaker="Pérez Gómez, Ana", role="Presidenta de RTVE"))
+    Speeches.save(Speech(_id="s3", reference="R1", order=3, group="GP",
+                         speaker="Diputado Uno, Juan", role="Diputado"))
+    Speeches.save(Speech(_id="s4", reference="R1", order=4, group=None,
+                         speaker="Suplente, Marta", role="Diputada"))
+    # same (speaker, role) twice → collapses to one distinct entry
+    Speeches.save(Speech(_id="s5", reference="R2", order=1, group="",
+                         speaker="Saiz Delgado, Elma",
+                         role="Ministra de Inclusión, Seguridad Social y Migraciones"))
+
+    result = Speeches.distinct_nondeputy_speakers()
+    pairs = {(r["speaker"], r["role"]) for r in result}
+    assert ("Saiz Delgado, Elma",
+            "Ministra de Inclusión, Seguridad Social y Migraciones") in pairs
+    assert ("Pérez Gómez, Ana", "Presidenta de RTVE") in pairs
+    assert not any(r["speaker"].startswith("Diputado Uno") for r in result)
+    assert not any(r["speaker"] == "Suplente, Marta" for r in result)
+    assert len(result) == 2
+
+
 # ---- Sessions -----------------------------------------------------------------------
 
 def test_sessions_save_upsert_accumulates_references(mongo_db):

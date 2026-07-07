@@ -19,15 +19,19 @@ class SpeechText(BaseModel):
 
 class Mention(BaseModel):
     """A person named *within* a speech (not the speaker). Extracted at index time
-    by NER over the Spanish text block and resolved against the deputies catalog.
+    by NER over the Spanish text block and resolved against a catalog of people.
 
-    ``deputy_id`` is the canonical ``Deputy._id`` when the mention resolved to a
-    known deputy; it is left ``None`` (reserved) for a future phase that also keeps
-    unresolved figures (ministers who are not deputies, the King, foreign leaders).
-    ``surface_forms`` collects the distinct raw spans that resolved to this person
-    (e.g. ``"Sánchez"``, ``"Pedro Sánchez"``); ``count`` is their total occurrences."""
+    ``person_id`` is the canonical id of the resolved person: a ``Deputy._id`` slug
+    for a sitting deputy, or the id of a non-deputy in the persons catalog (a
+    government minister, the King, a regional president, a foreign leader…).
+    ``person_type`` records which kind — ``"deputy"`` for deputies, otherwise
+    ``"minister"``/``"former_pm"``/``"regional_president"``/``"foreign_leader"``/
+    ``"head_of_state"``/``"official"``. ``surface_forms`` collects the distinct raw
+    spans that resolved to this person (e.g. ``"Sánchez"``, ``"Pedro Sánchez"``);
+    ``count`` is their total occurrences."""
 
-    deputy_id: str | None = None
+    person_id: str | None = None
+    person_type: str | None = None
     name: str
     surface_forms: list[str] = []
     count: int = 0
