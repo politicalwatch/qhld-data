@@ -156,7 +156,8 @@ def test_footprint_computed_at_is_per_instance():
 def test_speech_roundtrip():
     doc = {
         "_id": "sp-1",
-        "reference": "161/000123",
+        "references": ["161/000123", "161/000124"],
+        "video_id": "776209",
         "session_id": "sess-1",
         "speaker": "Apellido, Nombre",
         "speaker_surname": "Apellido",

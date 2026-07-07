@@ -38,7 +38,16 @@ class Mention(BaseModel):
 
 
 class Speech(MongoModel):
-    reference: str | None = None
+    """One physical intervention in a sitting.
+
+    When several initiatives are debated jointly (an accumulated debate), the same
+    intervention belongs to every one of them: ``references`` lists all the
+    initiative references it addresses, accumulated across per-reference extraction
+    runs (see ``Speeches.save``). ``video_id`` is the Congress intervention id
+    (``video_intervencion.id01``), empty until the sitting's video is published."""
+
+    references: list[str] = []
+    video_id: str | None = None
     session_id: str | None = None
     speaker: str | None = None
     speaker_surname: str | None = None

@@ -5,8 +5,21 @@ from tipi_data.models.speech import Speech
 class Speeches:
     @staticmethod
     def save(speech: Speech):
-        return db.speeches.replace_one(
-            {"_id": speech.id}, speech.to_bson(), upsert=True)
+        """Upsert a speech, accumulating its ``references`` roster.
+
+        Speeches are extracted per initiative ``reference``, so an accumulated
+        debate writes the same intervention once per initiative it addresses. A
+        plain ``replace_one`` would reset the roster to the single reference of
+        the current run; instead we ``$set`` the (stable) speech data and
+        ``$addToSet`` the references, so the roster grows as more of the debate's
+        initiatives are extracted. Same pattern as ``Sessions.save``."""
+        doc = speech.to_bson()
+        references = doc.pop("references", [])
+        doc.pop("_id", None)
+        update = {"$set": doc}
+        if references:
+            update["$addToSet"] = {"references": {"$each": references}}
+        return db.speeches.update_one({"_id": speech.id}, update, upsert=True)
 
     @staticmethod
     def get(id):
@@ -24,7 +37,7 @@ class Speeches:
     @staticmethod
     def by_references(references):
         """Yield the speeches of the given initiative references."""
-        for doc in db.speeches.find({"reference": {"$in": list(references)}}):
+        for doc in db.speeches.find({"references": {"$in": list(references)}}):
             yield Speech.model_validate(doc)
 
     @staticmethod

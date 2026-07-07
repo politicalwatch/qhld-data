@@ -509,29 +509,49 @@ def test_videos_save_roundtrip_and_upsert(mongo_db):
 # ---- Speeches -----------------------------------------------------------------------
 
 def test_speeches_save_roundtrip_and_upsert(mongo_db):
-    Speeches.save(Speech(_id="sp1", reference="R1", session_id="sess1",
+    Speeches.save(Speech(_id="sp1", references=["R1"], session_id="sess1",
                          speaker="Apellido, Nombre", order=1,
                          speech=[{"lang": "es", "text": "old text", "original": True}]))
     stored = mongo_db.speeches.find_one({"_id": "sp1"})
     assert stored["speech"][0]["text"] == "old text"
-    assert stored["reference"] == "R1"
+    assert stored["references"] == ["R1"]
     assert stored["session_id"] == "sess1"
 
     # save again with the same id updates in place (upsert), not duplicates
-    Speeches.save(Speech(_id="sp1", reference="R1", session_id="sess1",
+    Speeches.save(Speech(_id="sp1", references=["R1"], session_id="sess1",
                          speaker="Apellido, Nombre", order=1,
                          speech=[{"lang": "es", "text": "new text", "original": True}]))
     assert mongo_db.speeches.count_documents({}) == 1
     assert mongo_db.speeches.find_one({"_id": "sp1"})["speech"][0]["text"] == "new text"
 
 
+def test_speeches_save_upsert_accumulates_references(mongo_db):
+    # The same intervention extracted under the first initiative of an
+    # accumulated debate.
+    Speeches.save(Speech(_id="sp1", references=["210/000151"], video_id="776209",
+                         speaker="Apellido, Nombre", order=15,
+                         speech=[{"lang": "es", "text": "texto", "original": True}]))
+    stored = mongo_db.speeches.find_one({"_id": "sp1"})
+    assert stored["references"] == ["210/000151"]
+
+    # Re-extracted under the second initiative: one doc, roster accumulates
+    # (not clobbered), speech data is refreshed.
+    Speeches.save(Speech(_id="sp1", references=["210/000152"], video_id="776209",
+                         speaker="Apellido, Nombre", order=15,
+                         speech=[{"lang": "es", "text": "texto", "original": True}]))
+    assert mongo_db.speeches.count_documents({}) == 1
+    stored = mongo_db.speeches.find_one({"_id": "sp1"})
+    assert sorted(stored["references"]) == ["210/000151", "210/000152"]
+    assert stored["video_id"] == "776209"
+
+
 def test_speeches_read_methods(mongo_db):
-    Speeches.save(Speech(_id="sp1", reference="R1", order=1,
+    Speeches.save(Speech(_id="sp1", references=["R1"], order=1,
                          speech=[{"lang": "es", "text": "a", "original": True}]))
-    Speeches.save(Speech(_id="sp2", reference="R2", order=1,
+    Speeches.save(Speech(_id="sp2", references=["R2"], order=1,
                          speech=[{"lang": "es", "text": "b", "original": True}]))
 
-    assert Speeches.get("sp1").reference == "R1"
+    assert Speeches.get("sp1").references == ["R1"]
     assert {s.id for s in Speeches.all()} == {"sp1", "sp2"}
     assert [s.id for s in Speeches.by_references(["R2"])] == ["sp2"]
 
@@ -542,17 +562,17 @@ def test_speeches_read_methods(mongo_db):
 def test_speeches_distinct_nondeputy_speakers(mongo_db):
     # A minister (no group) and a witness (no group) are non-deputy speakers; a
     # deputy (has a group) and a group-less "Diputado" quirk are excluded.
-    Speeches.save(Speech(_id="s1", reference="R1", order=1, group=None,
+    Speeches.save(Speech(_id="s1", references=["R1"], order=1, group=None,
                          speaker="Saiz Delgado, Elma",
                          role="Ministra de Inclusión, Seguridad Social y Migraciones"))
-    Speeches.save(Speech(_id="s2", reference="R1", order=2, group=None,
+    Speeches.save(Speech(_id="s2", references=["R1"], order=2, group=None,
                          speaker="Pérez Gómez, Ana", role="Presidenta de RTVE"))
-    Speeches.save(Speech(_id="s3", reference="R1", order=3, group="GP",
+    Speeches.save(Speech(_id="s3", references=["R1"], order=3, group="GP",
                          speaker="Diputado Uno, Juan", role="Diputado"))
-    Speeches.save(Speech(_id="s4", reference="R1", order=4, group=None,
+    Speeches.save(Speech(_id="s4", references=["R1"], order=4, group=None,
                          speaker="Suplente, Marta", role="Diputada"))
     # same (speaker, role) twice → collapses to one distinct entry
-    Speeches.save(Speech(_id="s5", reference="R2", order=1, group="",
+    Speeches.save(Speech(_id="s5", references=["R2"], order=1, group="",
                          speaker="Saiz Delgado, Elma",
                          role="Ministra de Inclusión, Seguridad Social y Migraciones"))
 
