@@ -35,6 +35,16 @@ class Speeches:
             yield Speech.model_validate(doc)
 
     @staticmethod
+    def count_by_reference(reference):
+        """Number of stored speeches belonging to the given initiative reference."""
+        return db.speeches.count_documents({"references": reference})
+
+    @staticmethod
+    def delete(id):
+        """Remove a stored speech."""
+        return db.speeches.delete_one({"_id": id})
+
+    @staticmethod
     def by_references(references):
         """Yield the speeches of the given initiative references."""
         for doc in db.speeches.find({"references": {"$in": list(references)}}):

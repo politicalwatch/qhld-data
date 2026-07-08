@@ -559,6 +559,26 @@ def test_speeches_read_methods(mongo_db):
         Speeches.get("missing")
 
 
+def test_speeches_count_by_reference_and_delete(mongo_db):
+    Speeches.save(Speech(_id="sp1", references=["R1"], order=1,
+                         speech=[{"lang": "es", "text": "a", "original": True}]))
+    # an accumulated-debate speech belongs to two references at once
+    Speeches.save(Speech(_id="sp2", references=["R1", "R2"], order=2,
+                         speech=[{"lang": "es", "text": "b", "original": True}]))
+
+    assert Speeches.count_by_reference("R1") == 2
+    assert Speeches.count_by_reference("R2") == 1
+    assert Speeches.count_by_reference("R3") == 0
+
+    Speeches.delete("sp1")
+    assert mongo_db.speeches.count_documents({}) == 1
+    assert Speeches.count_by_reference("R1") == 1
+
+    # deleting a missing id is a no-op
+    Speeches.delete("missing")
+    assert mongo_db.speeches.count_documents({}) == 1
+
+
 def test_speeches_distinct_nondeputy_speakers(mongo_db):
     # A minister (no group) and a witness (no group) are non-deputy speakers; a
     # deputy (has a group) and a group-less "Diputado" quirk are excluded.
