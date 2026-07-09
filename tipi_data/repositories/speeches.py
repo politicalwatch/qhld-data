@@ -51,6 +51,28 @@ class Speeches:
             yield Speech.model_validate(doc)
 
     @staticmethod
+    def count_by_query(query):
+        return db.speeches.count_documents(query)
+
+    @staticmethod
+    def by_query_paginated(query, limit=None, skip=None):
+        """Speeches matching ``query``, optionally paginated.
+
+        Sorted by ``order`` ascending when the query is scoped to a single sitting
+        (``session_id``), so a session reads in the natural order interventions were
+        delivered; otherwise most recent first (``date`` desc, then ``order``)."""
+        if "session_id" in query:
+            sort = [("order", 1)]
+        else:
+            sort = [("date", -1), ("order", 1)]
+        cursor = db.speeches.find(query).sort(sort)
+        if skip:
+            cursor = cursor.skip(skip)
+        if limit:
+            cursor = cursor.limit(limit)
+        return [Speech.model_validate(d) for d in cursor]
+
+    @staticmethod
     def distinct_nondeputy_speakers():
         """Distinct ``{speaker, role}`` of everyone who has spoken but sits in no
         parliamentary group (``group`` null/empty) and is not labelled a plain

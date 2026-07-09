@@ -628,3 +628,44 @@ def test_sessions_save_upsert_accumulates_references(mongo_db):
     stored = mongo_db.sessions.find_one({"_id": "sess1"})
     assert sorted(stored["references"]) == ["172/000001", "172/000005"]
     assert stored["congress_session_id"] == "12"
+
+
+def test_sessions_read_methods(mongo_db):
+    Sessions.save(Session(_id="s-old", legislature="15", date=20231213,
+                          references=["172/000001"]))
+    Sessions.save(Session(_id="s-new", legislature="15", date=20240115,
+                          references=["172/000009"]))
+
+    assert Sessions.get("s-old").references == ["172/000001"]
+    assert Sessions.count_by_query({"legislature": "15"}) == 2
+    # most recent first
+    assert [s.id for s in Sessions.by_query_paginated({})] == ["s-new", "s-old"]
+    # paginated: second page, one per page
+    assert [s.id for s in Sessions.by_query_paginated({}, limit=1, skip=1)] == ["s-old"]
+
+    with pytest.raises(DoesNotExist):
+        Sessions.get("missing")
+
+
+def test_speeches_by_query_paginated_sorts_by_session_order(mongo_db):
+    # Two sittings; the older one has two out-of-insertion-order interventions.
+    Speeches.save(Speech(_id="a2", references=["R1"], session_id="sessA", order=2,
+                         date=20231213,
+                         speech=[{"lang": "es", "text": "a2", "original": True}]))
+    Speeches.save(Speech(_id="a1", references=["R1"], session_id="sessA", order=1,
+                         date=20231213,
+                         speech=[{"lang": "es", "text": "a1", "original": True}]))
+    Speeches.save(Speech(_id="b1", references=["R2"], session_id="sessB", order=1,
+                         date=20240115,
+                         speech=[{"lang": "es", "text": "b1", "original": True}]))
+
+    # Scoped to a sitting -> natural reading order (by 'order').
+    scoped = Speeches.by_query_paginated({"session_id": "sessA"})
+    assert [s.id for s in scoped] == ["a1", "a2"]
+    assert Speeches.count_by_query({"session_id": "sessA"}) == 2
+
+    # Unscoped -> most recent sitting first (date desc).
+    assert [s.id for s in Speeches.by_query_paginated({})][0] == "b1"
+
+    # reference membership matches an array element
+    assert Speeches.count_by_query({"references": "R2"}) == 1
