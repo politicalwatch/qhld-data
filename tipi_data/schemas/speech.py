@@ -6,8 +6,10 @@
   ``speech`` text blocks.
 
 ``mentions`` is the list of people named within the speech (resolved to deputies or to
-the non-deputy persons catalog); ``speech`` blocks carry the as-delivered original and
-its Spanish translation for co-official-language interventions.
+the non-deputy persons catalog); ``interruptions`` the people who interjected from the
+floor while it was delivered (each with the people THEY named); ``speech`` blocks carry
+the as-delivered original and its Spanish translation for co-official-language
+interventions.
 """
 
 from tipi_data.schemas.base import BaseSchema
@@ -27,6 +29,17 @@ class MentionOut(BaseSchema):
     count: int | None = None
 
 
+class InterruptionOut(BaseSchema):
+    person_id: str | None = None
+    person_type: str | None = None
+    name: str | None = None
+    surface_forms: list[str] = []
+    count: int | None = None
+    quotes: list[str] = []
+    reactions: list[str] = []
+    mentions: list[MentionOut] = []
+
+
 class SpeechCompactSchema(BaseSchema):
     id: str
     references: list[str] = []
@@ -44,6 +57,7 @@ class SpeechCompactSchema(BaseSchema):
     session_link: str | None = None
     original_language: str | None = None
     mentions: list[MentionOut] = []
+    interruptions: list[InterruptionOut] = []
 
 
 class SpeechExtendedSchema(SpeechCompactSchema):

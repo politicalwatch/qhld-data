@@ -37,6 +37,36 @@ class Mention(BaseModel):
     count: int = 0
 
 
+class Interruption(BaseModel):
+    """Someone interjecting from the floor while this speech is delivered, as
+    recorded by the stenographers in a parenthesized annotation of the Diario de
+    Sesiones — e.g. ``(El señor Núñez Feijóo: ¡Qué disparate!)``. Not part of what
+    the speaker said, so kept apart from ``Speech.mentions``.
+
+    ``person_id``/``person_type``/``name`` identify the interrupter as in
+    ``Mention``; an unidentified interrupter (``Un señor diputado``, ``Varios
+    señores diputados``…) has ``person_id=None`` and ``name`` set to the
+    transcript's own label. ``surface_forms`` collects the distinct ways the
+    transcript introduced them and ``count`` their total interjections here.
+
+    Each interjection is either verbal — its transcription joins ``quotes`` — or a
+    recorded reaction: ``reactions`` keeps the stenographer's description ("Risas",
+    "hace signos negativos", "pronuncia palabras que no se perciben"). Only floor
+    activity notable enough to be minuted lands in the Diario at all, so these
+    also serve as a disruption signal. ``mentions`` are the people THEY named
+    while interrupting (``(… Tellado Filgueira: Ábalos. Cerdán en la cárcel…)``
+    yields mentions of Ábalos and Cerdán here)."""
+
+    person_id: str | None = None
+    person_type: str | None = None
+    name: str
+    surface_forms: list[str] = []
+    count: int = 0
+    quotes: list[str] = []
+    reactions: list[str] = []
+    mentions: list[Mention] = []
+
+
 class Speech(MongoModel):
     """One physical intervention in a sitting.
 
@@ -62,3 +92,4 @@ class Speech(MongoModel):
     speech: list[SpeechText] = []
     original_language: str | None = None
     mentions: list[Mention] = []
+    interruptions: list[Interruption] = []
