@@ -29,6 +29,15 @@ class Speeches:
         return Speech.model_validate(doc)
 
     @staticmethod
+    def get_by_video_id(video_id):
+        """The speech of a Congress intervention id (``video_intervencion.id01``) —
+        the public, stable identifier once the sitting's video is published."""
+        doc = db.speeches.find_one({"video_id": video_id})
+        if doc is None:
+            raise DoesNotExist(f"Speech with video_id {video_id} does not exist")
+        return Speech.model_validate(doc)
+
+    @staticmethod
     def all():
         """Yield every stored speech (cursor-backed, for indexing the whole corpus)."""
         for doc in db.speeches.find():

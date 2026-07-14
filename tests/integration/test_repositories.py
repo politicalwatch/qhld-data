@@ -559,6 +559,19 @@ def test_speeches_read_methods(mongo_db):
         Speeches.get("missing")
 
 
+def test_speeches_get_by_video_id(mongo_db):
+    Speeches.save(Speech(_id="sp1", references=["R1"], order=1, video_id="752062",
+                         speech=[{"lang": "es", "text": "a", "original": True}]))
+    # a speech from a sitting whose video is not published yet has no video_id
+    Speeches.save(Speech(_id="sp2", references=["R2"], order=1,
+                         speech=[{"lang": "es", "text": "b", "original": True}]))
+
+    assert Speeches.get_by_video_id("752062").id == "sp1"
+
+    with pytest.raises(DoesNotExist):
+        Speeches.get_by_video_id("999999")
+
+
 def test_speeches_count_by_reference_and_delete(mongo_db):
     Speeches.save(Speech(_id="sp1", references=["R1"], order=1,
                          speech=[{"lang": "es", "text": "a", "original": True}]))

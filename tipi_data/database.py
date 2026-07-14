@@ -53,6 +53,7 @@ _INDEXES = {
         ([("references", ASCENDING)], {}),
         ([("session_id", ASCENDING)], {}),
         ([("date", ASCENDING)], {}),
+        ([("video_id", ASCENDING)], {}),
     ],
     "sessions": [
         ([("date", ASCENDING)], {}),
