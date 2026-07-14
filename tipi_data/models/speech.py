@@ -37,6 +37,26 @@ class Mention(BaseModel):
     count: int = 0
 
 
+class NamedEntity(BaseModel):
+    """A non-person named entity referenced within a speech — an organization
+    ("Navantia"), an event ("Eurovisión"), a law ("ley de amnistía"), a conflict
+    ("guerra de Gaza"), a place the speech talks about ("Sáhara Occidental")…
+    Extracted by NER over the Spanish text block, like ``Mention``, but with no
+    catalog to resolve against: the identity is the text itself.
+
+    ``key`` is the canonical normalized form (lowercased, unaccented, leading
+    articles stripped) — search filters match on it, so the same normalization
+    must produce it at tagging time and at query time. ``surface_forms`` collects
+    the distinct raw spans that normalized to this key ("la guerra de Gaza",
+    "guerra de Gaza"); ``count`` is their total occurrences. The NER label
+    (ORG/LOC/MISC) is deliberately not stored: the model assigns those too
+    erratically to carry meaning."""
+
+    key: str
+    surface_forms: list[str] = []
+    count: int = 0
+
+
 class Interruption(BaseModel):
     """Someone interjecting from the floor while this speech is delivered, as
     recorded by the stenographers in a parenthesized annotation of the Diario de
@@ -93,3 +113,4 @@ class Speech(MongoModel):
     original_language: str | None = None
     mentions: list[Mention] = []
     interruptions: list[Interruption] = []
+    entities: list[NamedEntity] = []

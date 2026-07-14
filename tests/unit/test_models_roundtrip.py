@@ -180,12 +180,25 @@ def test_speech_roundtrip():
             {"person_id": "isabel-diaz-ayuso", "person_type": "regional_president",
              "name": "Díaz Ayuso, Isabel", "surface_forms": ["Ayuso"], "count": 1},
         ],
+        "entities": [
+            {"key": "eurovision", "surface_forms": ["Eurovisión"], "count": 3},
+            {"key": "guerra de gaza",
+             "surface_forms": ["guerra de Gaza", "la guerra de Gaza"], "count": 2},
+        ],
     }
     dumped = assert_reproduces(Speech, doc)
     assert dumped["_id"] == "sp-1"
     assert "id" not in dumped  # dumped by alias only
     assert dumped["mentions"][0]["person_type"] == "deputy"
     assert dumped["mentions"][1]["person_id"] == "isabel-diaz-ayuso"
+    assert dumped["entities"][0]["key"] == "eurovision"
+
+
+def test_speech_without_entities_defaults_empty():
+    # Corpus documents predating the entities field must validate cleanly.
+    speech = Speech.model_validate({"_id": "sp-legacy"})
+    assert speech.entities == []
+    assert speech.mentions == []
 
 
 def test_session_roundtrip():
