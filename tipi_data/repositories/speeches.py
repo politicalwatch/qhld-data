@@ -100,3 +100,28 @@ class Speeches:
             {"speaker": doc["_id"]["speaker"], "role": doc["_id"].get("role")}
             for doc in db.speeches.aggregate(pipeline)
         ]
+
+    @staticmethod
+    def distinct_speaker_offices():
+        """Distinct ``{speaker, role}`` of everyone who has spoken under an office rather
+        than as a plain deputy — the government (ministers, vice-presidents, the prime
+        minister), the chair of the Chamber, and comparecencia witnesses. Says who HOLDS
+        an office, so a speech naming someone by their title ("el presidente Sánchez")
+        can be resolved to them. Grows automatically as more sessions import.
+
+        Two differences from ``distinct_nondeputy_speakers``, and both matter here:
+        no parliamentary-group filter, because the prime minister sits in one (``GS``)
+        and is otherwise the biggest office holder missing; and the deputy role is
+        excluded by an ANCHORED pattern, so "Presidenta del Congreso de los Diputados"
+        survives — a substring match on "Diputad" would throw it away."""
+        pipeline = [
+            {"$match": {
+                "speaker": {"$nin": [None, ""]},
+                "role": {"$not": {"$regex": "^Diputad", "$options": "i"}},
+            }},
+            {"$group": {"_id": {"speaker": "$speaker", "role": "$role"}}},
+        ]
+        return [
+            {"speaker": doc["_id"]["speaker"], "role": doc["_id"].get("role")}
+            for doc in db.speeches.aggregate(pipeline)
+        ]
