@@ -27,6 +27,7 @@ from tipi_data.models.topic import Topic
 from tipi_data.models.video import Video
 from tipi_data.repositories.alerts import Alerts, InitiativeAlerts
 from tipi_data.repositories.amendments import Amendments
+from tipi_data.repositories.dataset_updates import DatasetUpdates
 from tipi_data.repositories.deputies import Deputies
 from tipi_data.repositories.footprints import Footprints
 from tipi_data.repositories.initiatives import Initiatives
@@ -682,3 +683,24 @@ def test_speeches_by_query_paginated_sorts_by_session_order(mongo_db):
 
     # reference membership matches an array element
     assert Speeches.count_by_query({"references": "R2"}) == 1
+
+
+# ---- DatasetUpdates -----------------------------------------------------------------
+
+def test_dataset_updates_touch_upserts_and_advances(mongo_db):
+    DatasetUpdates.touch("deputies")
+    first = DatasetUpdates.get_all()
+    assert list(first) == ["deputies"]
+
+    DatasetUpdates.touch("deputies")
+    DatasetUpdates.touch("parliamentary-groups")
+    second = DatasetUpdates.get_all()
+
+    # Same dataset touched twice is one document with a newer timestamp.
+    assert mongo_db.dataset_updates.count_documents({"_id": "deputies"}) == 1
+    assert second["deputies"] >= first["deputies"]
+    assert set(second) == {"deputies", "parliamentary-groups"}
+
+
+def test_dataset_updates_get_all_empty(mongo_db):
+    assert DatasetUpdates.get_all() == {}
