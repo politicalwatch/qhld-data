@@ -7,12 +7,14 @@ from datetime import datetime
 
 import pytest
 from bson import ObjectId
+from pydantic import ValidationError
 
 from tipi_data.models.alert import Alert, Search
 from tipi_data.models.deputy import Deputy
 from tipi_data.models.footprint import FootprintByTopic
 from tipi_data.models.initiative import Initiative
 from tipi_data.models.place import Place
+from tipi_data.models.search_rating import SearchRating
 from tipi_data.models.session import Session
 from tipi_data.models.speech import Speech
 from tipi_data.models.stats import Stats
@@ -199,6 +201,45 @@ def test_speech_without_entities_defaults_empty():
     speech = Speech.model_validate({"_id": "sp-legacy"})
     assert speech.entities == []
     assert speech.mentions == []
+
+
+def test_search_rating_roundtrip():
+    doc = {
+        "_id": ObjectId(),
+        "rating": 2,
+        "query": "intervenciones de Tesh Sidi sobre el Sáhara",
+        "query_meta": {
+            "semantic_query": "Sáhara",
+            "filters": {},
+            "browse": False,
+            "unresolved": [
+                {"field": "speaker", "value": "Tesh Sidi", "blocking": True,
+                 "suggestion": "'Sidi Mohamed, Tesh' (61)"}
+            ],
+        },
+        "reasons": ["persona_no_reconocida"],
+        "comment": "No encuentra a esta diputada",
+        "result_ids": ["sp-1", "sp-2"],
+        "results_count": 2,
+        "corpus": "2026-08-03T04:12:00",
+        "created_at": datetime(2026, 8, 3, 9, 30, 0),
+    }
+    assert_reproduces(SearchRating, doc)
+
+
+def test_search_rating_is_insertable_and_strict():
+    rating = SearchRating(rating=5, query="vivienda")
+    dumped = rating.to_bson()
+    # A fresh rating has no _id, so Mongo assigns one on insert.
+    assert "_id" not in dumped
+    assert isinstance(dumped["created_at"], datetime)
+    assert dumped["reasons"] == []
+    assert "comment" not in dumped  # unset -> None -> excluded
+
+    # extra="forbid": the payload comes from a public endpoint, so an unexpected
+    # key must be rejected rather than silently persisted.
+    with pytest.raises(ValidationError):
+        SearchRating(rating=5, query="vivienda", injected="whatever")
 
 
 def test_session_roundtrip():

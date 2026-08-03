@@ -11,7 +11,7 @@ keep the on-disk BSON shape unchanged.
 
 from os import environ as env
 
-from pymongo import ASCENDING, MongoClient, TEXT
+from pymongo import ASCENDING, DESCENDING, MongoClient, TEXT
 from pymongo.errors import PyMongoError
 
 from . import config
@@ -59,6 +59,8 @@ _INDEXES = {
         ([("date", ASCENDING)], {}),
         ([("references", ASCENDING)], {}),
     ],
+    # Newest-first: every read of this collection is "what have users said lately".
+    "search_ratings": [([("created_at", DESCENDING)], {})],
 }
 
 
