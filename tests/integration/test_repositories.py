@@ -20,6 +20,7 @@ from tipi_data.models.footprint import (
 from tipi_data.models.initiative import Initiative
 from tipi_data.models.parliamentarygroup import ParliamentaryGroup
 from tipi_data.models.place import Place
+from tipi_data.models.query_gap import AMBIGUOUS, UNRESOLVED, QueryGapEvent
 from tipi_data.models.session import Session
 from tipi_data.models.speech import Speech
 from tipi_data.models.stats import Stats as StatsModel
@@ -35,6 +36,7 @@ from tipi_data.repositories.initiativetypes import InitiativeTypes
 from tipi_data.repositories.knowledgebases import KnowledgeBases
 from tipi_data.repositories.parliamentarygroups import ParliamentaryGroups
 from tipi_data.repositories.places import Places
+from tipi_data.repositories.query_gaps import EXAMPLES_KEPT, QueryGaps
 from tipi_data.repositories.scanned import Scanned
 from tipi_data.repositories.sessions import Sessions
 from tipi_data.repositories.speeches import Speeches
@@ -704,3 +706,89 @@ def test_dataset_updates_touch_upserts_and_advances(mongo_db):
 
 def test_dataset_updates_get_all_empty(mongo_db):
     assert DatasetUpdates.get_all() == {}
+
+
+# ---- QueryGaps ----------------------------------------------------------------------
+
+def _gap_event(**overrides):
+    payload = dict(
+        field="mentions", key="rueda", outcome=UNRESOLVED, value="Rueda",
+        query="qué ha dicho Rueda sobre la sanidad", semantic_query="sanidad",
+        blocking=True, suggestion=None, parser_model="nano",
+        at=datetime(2026, 8, 4, 9, 12, 0),
+    )
+    payload.update(overrides)
+    return QueryGapEvent(**payload)
+
+
+def test_query_gaps_fold_repeat_sightings_into_one_document(mongo_db):
+    QueryGaps.record(_gap_event())
+    QueryGaps.record(_gap_event(
+        value="señor Rueda", suggestion="'Rueda Perelló, Patricia' (87)",
+        blocking=False, at=datetime(2026, 9, 2, 11, 4, 0)))
+
+    assert mongo_db.query_gaps.count_documents({}) == 1
+    gap = QueryGaps.get_all()[0]
+    assert gap.count == 2
+    # Only the first sighting left a real person with no results at all.
+    assert gap.blocking_count == 1
+    assert sorted(gap.surface_forms) == ["Rueda", "señor Rueda"]
+    # Both hints kept, the null included: "no candidate at all" and "a near miss" are
+    # different findings, and holding both is how a reviewer sees the catalog having
+    # changed underneath a row.
+    assert None in gap.suggestions
+    assert "'Rueda Perelló, Patricia' (87)" in gap.suggestions
+    # Per-month counters answer "is this still happening" without a second collection.
+    assert gap.counts_by_month == {"2026-08": 1, "2026-09": 1}
+    assert gap.first_seen == datetime(2026, 8, 4, 9, 12, 0)
+    assert gap.last_seen == datetime(2026, 9, 2, 11, 4, 0)
+
+
+def test_query_gaps_keep_only_the_most_recent_examples(mongo_db):
+    for i in range(EXAMPLES_KEPT + 3):
+        QueryGaps.record(_gap_event(query=f"consulta {i}"))
+
+    gap = QueryGaps.get_all()[0]
+    assert gap.count == EXAMPLES_KEPT + 3
+    # The document stays a fixed size however popular the gap is, and what survives is
+    # the recent end — how it resolves NOW is the question being asked of it.
+    assert [e["query"] for e in gap.examples] == [
+        f"consulta {i}" for i in range(3, EXAMPLES_KEPT + 3)]
+
+
+def test_query_gaps_separate_outcomes_and_fields(mongo_db):
+    QueryGaps.record(_gap_event())
+    QueryGaps.record(_gap_event(
+        outcome=AMBIGUOUS, field="speaker", blocking=False,
+        chosen="Rueda Perelló, Patricia",
+        tied=["Rueda Perelló, Patricia", "Rueda Pérez, Juan Carlos"]))
+
+    # Same surface form, but a missing catalog entry and an arbitrarily broken tie are
+    # different findings with different fixes, so they must not share a document.
+    assert mongo_db.query_gaps.count_documents({}) == 2
+    ambiguous = QueryGaps.by_field("speaker")[0]
+    assert ambiguous.chosen == ["Rueda Perelló, Patricia"]
+    assert sorted(ambiguous.tied) == [
+        "Rueda Perelló, Patricia", "Rueda Pérez, Juan Carlos"]
+
+
+def test_query_gaps_record_the_flip_that_proves_a_tie_is_unstable(mongo_db):
+    tied = ["Rueda Perelló, Patricia", "Rueda Pérez, Juan Carlos"]
+    for chosen in tied:  # the same query resolving differently, as it does across restarts
+        QueryGaps.record(_gap_event(
+            outcome=AMBIGUOUS, field="speaker", blocking=False, chosen=chosen, tied=tied))
+
+    gap = QueryGaps.by_field("speaker")[0]
+    # Two winners for one query is the evidence that the pick follows set ordering
+    # rather than anything about the query.
+    assert sorted(gap.chosen) == tied
+    assert gap.count == 2
+
+
+def test_query_gaps_worst_first(mongo_db):
+    QueryGaps.record(_gap_event(key="rueda", blocking=False))
+    for _ in range(2):
+        QueryGaps.record(_gap_event(key="jacinta perez", blocking=True))
+
+    # "Worst" is how many real people got nothing, not raw popularity.
+    assert [g.key for g in QueryGaps.get_all()] == ["jacinta perez", "rueda"]

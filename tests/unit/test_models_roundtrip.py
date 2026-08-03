@@ -14,6 +14,7 @@ from tipi_data.models.deputy import Deputy
 from tipi_data.models.footprint import FootprintByTopic
 from tipi_data.models.initiative import Initiative
 from tipi_data.models.place import Place
+from tipi_data.models.query_gap import UNRESOLVED, QueryGap, QueryGapEvent
 from tipi_data.models.search_rating import SearchRating
 from tipi_data.models.session import Session
 from tipi_data.models.speech import Speech
@@ -240,6 +241,49 @@ def test_search_rating_is_insertable_and_strict():
     # key must be rejected rather than silently persisted.
     with pytest.raises(ValidationError):
         SearchRating(rating=5, query="vivienda", injected="whatever")
+
+
+def test_query_gap_roundtrip():
+    doc = {
+        "_id": ObjectId("665f1c2e4a1b2c3d4e5f6071"),
+        "field": "mentions",
+        "key": "rueda",
+        "outcome": "unresolved",
+        "surface_forms": ["Rueda", "señor Rueda"],
+        "count": 14,
+        "blocking_count": 12,
+        "counts_by_month": {"2026-08": 12, "2026-09": 2},
+        "suggestions": [None, "'Rueda Perelló, Patricia' (87)"],
+        "chosen": [],
+        "tied": [],
+        "examples": [{
+            "query": "qué ha dicho Rueda sobre la sanidad gallega",
+            "semantic_query": "sanidad gallega",
+            "filters": {},
+            "value": "Rueda",
+            "suggestion": "'Rueda Perelló, Patricia' (87)",
+            "parser_model": "gpt-5.4-nano-2026-03-17",
+            "at": datetime(2026, 9, 2, 11, 4, 0),
+        }],
+        "first_seen": datetime(2026, 8, 4, 9, 12, 0),
+        "last_seen": datetime(2026, 9, 2, 11, 4, 0),
+    }
+    assert_reproduces(QueryGap, doc)
+
+
+def test_query_gap_event_is_strict():
+    event = QueryGapEvent(
+        field="mentions", key="rueda", outcome=UNRESOLVED, value="Rueda",
+        query="qué ha dicho Rueda")
+    assert isinstance(event.at, datetime)
+    assert event.tied == [] and event.suggestion is None
+
+    # extra="forbid" here guards against OUR typos, not a hostile payload: the event is
+    # assembled field by field at the call site, where a misspelled name would otherwise
+    # be stored as a new field and noticed by nobody.
+    with pytest.raises(ValidationError):
+        QueryGapEvent(field="mentions", key="rueda", outcome=UNRESOLVED, value="Rueda",
+                      query="x", sugestion="typo")
 
 
 def test_session_roundtrip():
