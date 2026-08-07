@@ -9,7 +9,8 @@
 the non-deputy persons catalog); ``interruptions`` the people who interjected from the
 floor while it was delivered (each with the people THEY named); ``speech`` blocks carry
 the as-delivered original and its Spanish translation for co-official-language
-interventions.
+interventions; ``subtitles`` says whether the intervention's video has a timed
+transcript to load as a track.
 """
 
 from tipi_data.schemas.base import BaseSchema
@@ -40,6 +41,17 @@ class InterruptionOut(BaseSchema):
     mentions: list[MentionOut] = []
 
 
+class SubtitleTrackOut(BaseSchema):
+    """That a speech has subtitles, and what language they are in.
+
+    Only whether a track can be fetched, never the cues: the track itself is a
+    separate request the player makes, and most speeches have none, so a detail
+    response says which language to label it with and stops there.
+    """
+
+    lang: str | None = None
+
+
 class SpeechCompactSchema(BaseSchema):
     id: str
     references: list[str] = []
@@ -62,3 +74,7 @@ class SpeechCompactSchema(BaseSchema):
 
 class SpeechExtendedSchema(SpeechCompactSchema):
     speech: list[SpeechTextOut] = []
+    # Filled in by the caller, not by the speech document: alignments live in
+    # their own collection. Absent (dropped as ``None``) whenever the speech has
+    # no usable subtitle track — see ``repositories.speech_alignments``.
+    subtitles: SubtitleTrackOut | None = None

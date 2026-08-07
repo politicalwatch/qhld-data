@@ -23,6 +23,7 @@ from tipi_data.models.place import Place
 from tipi_data.models.query_gap import AMBIGUOUS, UNRESOLVED, QueryGapEvent
 from tipi_data.models.session import Session
 from tipi_data.models.speech import Speech
+from tipi_data.models.speech_alignment import SpeechAlignment
 from tipi_data.models.stats import Stats as StatsModel
 from tipi_data.models.topic import Topic
 from tipi_data.models.video import Video
@@ -39,6 +40,7 @@ from tipi_data.repositories.places import Places
 from tipi_data.repositories.query_gaps import EXAMPLES_KEPT, QueryGaps
 from tipi_data.repositories.scanned import Scanned
 from tipi_data.repositories.sessions import Sessions
+from tipi_data.repositories.speech_alignments import SpeechAlignments
 from tipi_data.repositories.speeches import Speeches
 from tipi_data.repositories.stats import Stats
 from tipi_data.repositories.tags import Tags
@@ -620,6 +622,46 @@ def test_speeches_distinct_nondeputy_speakers(mongo_db):
     assert not any(r["speaker"].startswith("Diputado Uno") for r in result)
     assert not any(r["speaker"] == "Suplente, Marta" for r in result)
     assert len(result) == 2
+
+
+# ---- Speech alignments --------------------------------------------------------------
+
+def _alignment(id="sp1", cues=2):
+    return SpeechAlignment(
+        _id=id, lang="gl", block_index=0, text_sha256="a" * 64, text_length=10424,
+        cues=[{"start_ms": 1000 * i, "end_ms": 1000 * i + 900,
+               "char_start": 10 * i, "char_end": 10 * i + 9} for i in range(cues)],
+        score=90.3, verdict="ok")
+
+
+def test_speech_alignments_save_get_and_supersede(mongo_db):
+    SpeechAlignments.save(_alignment(cues=2))
+    assert SpeechAlignments.exists("sp1")
+    assert len(SpeechAlignments.get("sp1").cues) == 2
+
+    # A re-alignment replaces its predecessor rather than accumulating with it.
+    SpeechAlignments.save(_alignment(cues=5))
+    assert mongo_db.speech_alignments.count_documents({}) == 1
+    assert len(SpeechAlignments.get("sp1").cues) == 5
+
+    SpeechAlignments.delete("sp1")
+    assert not SpeechAlignments.exists("sp1")
+    with pytest.raises(DoesNotExist):
+        SpeechAlignments.get("sp1")
+
+
+def test_speech_alignments_summary_leaves_the_cues_behind(mongo_db):
+    SpeechAlignments.save(_alignment(cues=148))
+
+    summary = SpeechAlignments.summary("sp1")
+
+    # The language to label a track with and the fingerprint to trust it, without
+    # the cue list that is the whole weight of the document.
+    assert summary["lang"] == "gl"
+    assert summary["text_sha256"] == "a" * 64
+    assert summary["text_length"] == 10424
+    assert "cues" not in summary
+    assert SpeechAlignments.summary("missing") is None
 
 
 # ---- Sessions -----------------------------------------------------------------------
