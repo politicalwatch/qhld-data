@@ -68,6 +68,9 @@ _INDEXES = {
          {"unique": True}),
         ([("last_seen", DESCENDING)], {}),
     ],
+    # No entry for ``speech_alignments`` on purpose: it is keyed by the speech id and
+    # every read is a lookup by ``_id``, which Mongo indexes itself. The absence is a
+    # decision, not an oversight.
 }
 
 

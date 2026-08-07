@@ -18,6 +18,7 @@ from tipi_data.models.query_gap import UNRESOLVED, QueryGap, QueryGapEvent
 from tipi_data.models.search_rating import SearchRating
 from tipi_data.models.session import Session
 from tipi_data.models.speech import Speech
+from tipi_data.models.speech_alignment import SpeechAlignment
 from tipi_data.models.stats import Stats
 from tipi_data.models.voting import Voting
 
@@ -202,6 +203,43 @@ def test_speech_without_entities_defaults_empty():
     speech = Speech.model_validate({"_id": "sp-legacy"})
     assert speech.entities == []
     assert speech.mentions == []
+
+
+def test_speech_alignment_roundtrip():
+    doc = {
+        "_id": "sp-1",
+        "lang": "gl",
+        "block_index": 0,
+        "cues": [
+            {"start_ms": 12013, "end_ms": 15136, "char_start": 0, "char_end": 26},
+            {"start_ms": 16357, "end_ms": 21343, "char_start": 27, "char_end": 83},
+        ],
+        "text_sha256": "a" * 64,
+        "text_length": 10411,
+        "model_id": "onnx-community/mms-300m-1130-forced-aligner-ONNX",
+        "model_revision": "2100fb247d8e",
+        "model_sha256": "b" * 64,
+        "score": 97.0,
+        "verdict": "ok",
+        "audio_seconds": 755.02,
+        "created_at": datetime(2026, 8, 6, 21, 9, 0),
+    }
+    dumped = assert_reproduces(SpeechAlignment, doc)
+    assert dumped["_id"] == "sp-1"
+    assert "id" not in dumped  # dumped by alias only
+    assert dumped["cues"][1]["start_ms"] == 16357
+
+
+def test_speech_alignment_defaults_are_insertable():
+    alignment = SpeechAlignment(
+        _id="sp-2", lang="es", block_index=0, text_sha256="c" * 64, text_length=9693)
+    dumped = alignment.to_bson()
+    assert dumped["_id"] == "sp-2"
+    assert dumped["cues"] == []
+    assert isinstance(dumped["created_at"], datetime)
+    # Unscored until the trust gate has run; unset -> None -> excluded.
+    assert "score" not in dumped
+    assert "verdict" not in dumped
 
 
 def test_search_rating_roundtrip():
