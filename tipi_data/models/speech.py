@@ -94,7 +94,14 @@ class Speech(MongoModel):
     intervention belongs to every one of them: ``references`` lists all the
     initiative references it addresses, accumulated across per-reference extraction
     runs (see ``Speeches.save``). ``video_id`` is the Congress intervention id
-    (``video_intervencion.id01``), empty until the sitting's video is published."""
+    (``video_intervencion.id01``), empty until the sitting's video is published.
+
+    ``duration`` is how many seconds that video runs, read from its container header.
+    It is what makes the stored text checkable: a transcript should take roughly as
+    long to say as its clip lasts, so text that could not physically have been spoken
+    in the time available has been truncated, over-captured, or mis-split across
+    languages. ``None`` where the video is unpublished or its header unreadable —
+    never ``0``, which would read as an empty clip."""
 
     references: list[str] = []
     video_id: str | None = None
@@ -109,6 +116,7 @@ class Speech(MongoModel):
     session_name: str | None = None
     video_link: str | None = None
     session_link: str | None = None
+    duration: float | None = None
     speech: list[SpeechText] = []
     original_language: str | None = None
     mentions: list[Mention] = []
