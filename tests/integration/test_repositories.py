@@ -23,7 +23,7 @@ from tipi_data.models.place import Place
 from tipi_data.models.query_gap import AMBIGUOUS, UNRESOLVED, QueryGapEvent
 from tipi_data.models.session import Session
 from tipi_data.models.speech import Speech
-from tipi_data.models.speech_alignment import SpeechAlignment
+from tipi_data.models.speech_alignment import SpeechAlignment, track_id
 from tipi_data.models.stats import Stats as StatsModel
 from tipi_data.models.topic import Topic
 from tipi_data.models.video import Video
@@ -626,9 +626,11 @@ def test_speeches_distinct_nondeputy_speakers(mongo_db):
 
 # ---- Speech alignments --------------------------------------------------------------
 
-def _alignment(id="sp1", cues=2):
+def _alignment(speech_id="sp1", lang="gl", cues=2, original=True, block_index=0):
     return SpeechAlignment(
-        _id=id, lang="gl", block_index=0, text_sha256="a" * 64, text_length=10424,
+        _id=track_id(speech_id, lang), speech_id=speech_id, lang=lang,
+        block_index=block_index, original=original,
+        text_sha256="a" * 64, text_length=10424,
         cues=[{"start_ms": 1000 * i, "end_ms": 1000 * i + 900,
                "char_start": 10 * i, "char_end": 10 * i + 9} for i in range(cues)],
         score=90.3, verdict="ok")
@@ -636,24 +638,41 @@ def _alignment(id="sp1", cues=2):
 
 def test_speech_alignments_save_get_and_supersede(mongo_db):
     SpeechAlignments.save(_alignment(cues=2))
-    assert SpeechAlignments.exists("sp1")
-    assert len(SpeechAlignments.get("sp1").cues) == 2
+    assert SpeechAlignments.exists("sp1", "gl")
+    assert len(SpeechAlignments.get("sp1", "gl").cues) == 2
 
     # A re-alignment replaces its predecessor rather than accumulating with it.
     SpeechAlignments.save(_alignment(cues=5))
     assert mongo_db.speech_alignments.count_documents({}) == 1
-    assert len(SpeechAlignments.get("sp1").cues) == 5
+    assert len(SpeechAlignments.get("sp1", "gl").cues) == 5
 
-    SpeechAlignments.delete("sp1")
-    assert not SpeechAlignments.exists("sp1")
+    SpeechAlignments.delete("sp1", "gl")
+    assert not SpeechAlignments.exists("sp1", "gl")
     with pytest.raises(DoesNotExist):
-        SpeechAlignments.get("sp1")
+        SpeechAlignments.get("sp1", "gl")
+
+
+def test_re_aligning_one_language_leaves_its_sibling_alone(mongo_db):
+    """What the composite key buys: the two tracks of a co-official speech are separate
+    documents, so correcting the Spanish one cannot drop the Galician."""
+    SpeechAlignments.save(_alignment(lang="gl", cues=148, original=True))
+    SpeechAlignments.save(
+        _alignment(lang="es", cues=151, original=False, block_index=1))
+    assert mongo_db.speech_alignments.count_documents({}) == 2
+
+    SpeechAlignments.save(
+        _alignment(lang="es", cues=160, original=False, block_index=1))
+
+    assert mongo_db.speech_alignments.count_documents({}) == 2
+    assert len(SpeechAlignments.get("sp1", "gl").cues) == 148
+    assert len(SpeechAlignments.get("sp1", "es").cues) == 160
+    assert SpeechAlignments.get("sp1", "es").original is False
 
 
 def test_speech_alignments_summary_leaves_the_cues_behind(mongo_db):
     SpeechAlignments.save(_alignment(cues=148))
 
-    summary = SpeechAlignments.summary("sp1")
+    summary = SpeechAlignments.summary("sp1", "gl")
 
     # The language to label a track with and the fingerprint to trust it, without
     # the cue list that is the whole weight of the document.
@@ -661,7 +680,36 @@ def test_speech_alignments_summary_leaves_the_cues_behind(mongo_db):
     assert summary["text_sha256"] == "a" * 64
     assert summary["text_length"] == 10424
     assert "cues" not in summary
-    assert SpeechAlignments.summary("missing") is None
+    assert SpeechAlignments.summary("missing", "gl") is None
+    # A speech that has one track does not thereby have the other.
+    assert SpeechAlignments.summary("sp1", "es") is None
+
+
+def test_summaries_answers_for_every_language_at_once(mongo_db):
+    SpeechAlignments.save(_alignment(lang="gl", cues=148))
+    SpeechAlignments.save(
+        _alignment(lang="es", cues=151, original=False, block_index=1))
+
+    summaries = SpeechAlignments.summaries("sp1", ["gl", "es"])
+
+    # In the order asked for, so the caller controls which track a page offers first.
+    assert [s["lang"] for s in summaries] == ["gl", "es"]
+    assert all("cues" not in s for s in summaries)
+    # A language with no track is simply absent — that is how the caller learns.
+    assert [s["lang"] for s in SpeechAlignments.summaries("sp1", ["eu", "es"])] == ["es"]
+    assert SpeechAlignments.summaries("sp1", []) == []
+    assert SpeechAlignments.summaries("missing", ["gl", "es"]) == []
+
+
+def test_delete_all_drops_every_track_of_one_speech_only(mongo_db):
+    SpeechAlignments.save(_alignment(lang="gl"))
+    SpeechAlignments.save(_alignment(lang="es", original=False, block_index=1))
+    SpeechAlignments.save(_alignment(speech_id="sp2", lang="es"))
+
+    SpeechAlignments.delete_all("sp1", ["gl", "es"])
+
+    assert mongo_db.speech_alignments.count_documents({}) == 1
+    assert SpeechAlignments.exists("sp2", "es")
 
 
 # ---- Sessions -----------------------------------------------------------------------

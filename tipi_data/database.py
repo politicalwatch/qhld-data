@@ -68,9 +68,12 @@ _INDEXES = {
          {"unique": True}),
         ([("last_seen", DESCENDING)], {}),
     ],
-    # No entry for ``speech_alignments`` on purpose: it is keyed by the speech id and
-    # every read is a lookup by ``_id``, which Mongo indexes itself. The absence is a
-    # decision, not an oversight.
+    # No entry for ``speech_alignments`` on purpose, and it survived the move to one
+    # document per speech AND language. The key is composite ("<speech id>:<lang>") but
+    # every read is still a lookup by ``_id``: a caller knows the candidate languages
+    # from ``Speech.speech[].lang``, so even "which tracks does this speech have" is an
+    # ``$in`` over two ids rather than a search on a field. The absence is a decision,
+    # not an oversight.
 }
 
 

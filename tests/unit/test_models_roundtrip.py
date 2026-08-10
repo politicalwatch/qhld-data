@@ -18,7 +18,7 @@ from tipi_data.models.query_gap import UNRESOLVED, QueryGap, QueryGapEvent
 from tipi_data.models.search_rating import SearchRating
 from tipi_data.models.session import Session
 from tipi_data.models.speech import Speech
-from tipi_data.models.speech_alignment import SpeechAlignment
+from tipi_data.models.speech_alignment import SpeechAlignment, track_id
 from tipi_data.models.stats import Stats
 from tipi_data.models.voting import Voting
 
@@ -207,9 +207,11 @@ def test_speech_without_entities_defaults_empty():
 
 def test_speech_alignment_roundtrip():
     doc = {
-        "_id": "sp-1",
+        "_id": "sp-1:gl",
+        "speech_id": "sp-1",
         "lang": "gl",
         "block_index": 0,
+        "original": True,
         "cues": [
             {"start_ms": 12013, "end_ms": 15136, "char_start": 0, "char_end": 26},
             {"start_ms": 16357, "end_ms": 21343, "char_start": 27, "char_end": 83},
@@ -225,21 +227,32 @@ def test_speech_alignment_roundtrip():
         "created_at": datetime(2026, 8, 6, 21, 9, 0),
     }
     dumped = assert_reproduces(SpeechAlignment, doc)
-    assert dumped["_id"] == "sp-1"
+    assert dumped["_id"] == "sp-1:gl"
     assert "id" not in dumped  # dumped by alias only
     assert dumped["cues"][1]["start_ms"] == 16357
 
 
 def test_speech_alignment_defaults_are_insertable():
     alignment = SpeechAlignment(
-        _id="sp-2", lang="es", block_index=0, text_sha256="c" * 64, text_length=9693)
+        _id=track_id("sp-2", "es"), speech_id="sp-2", lang="es", block_index=0,
+        text_sha256="c" * 64, text_length=9693)
     dumped = alignment.to_bson()
-    assert dumped["_id"] == "sp-2"
+    assert dumped["_id"] == "sp-2:es"
     assert dumped["cues"] == []
     assert isinstance(dumped["created_at"], datetime)
+    # A track is as-delivered unless it says otherwise: the plain case is a speech
+    # given in Spanish, whose only block is the one that was spoken.
+    assert dumped["original"] is True
     # Unscored until the trust gate has run; unset -> None -> excluded.
     assert "score" not in dumped
     assert "verdict" not in dumped
+
+
+def test_the_two_tracks_of_one_speech_get_distinct_keys():
+    """The whole point of the composite key: a co-official speech carries an
+    as-delivered track and a Spanish one, and neither may overwrite the other."""
+    assert track_id("sp-3", "gl") != track_id("sp-3", "es")
+    assert track_id("sp-3", "gl").startswith("sp-3")
 
 
 def test_search_rating_roundtrip():
