@@ -4,17 +4,41 @@ from tipi_data.models.base import MongoModel
 
 
 class SpeechText(BaseModel):
-    """A single-language block of a speech.
+    """One block of a speech, identified by the role it plays rather than by where it
+    sat in the document.
 
-    Co-official-language speeches are published in the Diario de Sesiones as the
-    full original (Galician/Catalan/Basque) followed by its full Spanish
-    translations. We store each language as its own block: ``original`` marks the
-    as-delivered block, ``lang`` is the detected ISO-639-1 code. Monolingual
-    speeches have a single block (``original=True``)."""
+    A co-official-language speech is usually published in the Diario de Sesiones as the
+    original (Galician/Catalan/Basque) followed by a Spanish rendering of it, and each
+    becomes a block: ``original`` marks what was delivered, ``lang`` the ISO-639-1 code
+    of the language it is mostly in. A speech delivered in one language — or in two,
+    with no rendering published — has a single block, and that block may mix languages:
+    the quotations a speaker reads aloud, a greeting, a passage they switch into.
+    ``lang`` names the language the speech is *in*, not a guarantee about every sentence.
+
+    ``partial`` marks a rendering that covers only part of the original. It is never set
+    on an ``original`` block, which is complete by construction."""
 
     lang: str
     text: str
     original: bool
+    partial: bool = False
+
+
+class SplitVerdict(BaseModel):
+    """How a speech's blocks were arrived at, when it was not simply read off the text.
+
+    Absent on the ordinary speech, whose shape the text and the clip settle between them
+    — the same convention ``SpeechText.partial`` follows. ``method`` is ``"undecided"``
+    where the evidence did not settle it and the blocks are a provisional reading, or
+    ``"acoustic"`` where the audio was consulted to break the tie.
+
+    ``fingerprint`` is of the text the verdict was reached against. Extraction re-reads
+    this rather than recomputing (deciding acoustically costs a video download), so the
+    fingerprint is what stops a verdict outliving the text it describes: when they
+    disagree the verdict is discarded and the speech is decided afresh."""
+
+    method: str
+    fingerprint: str
 
 
 class Mention(BaseModel):
@@ -119,6 +143,7 @@ class Speech(MongoModel):
     duration: float | None = None
     speech: list[SpeechText] = []
     original_language: str | None = None
+    split_verdict: SplitVerdict | None = None
     mentions: list[Mention] = []
     interruptions: list[Interruption] = []
     entities: list[NamedEntity] = []

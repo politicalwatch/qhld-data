@@ -174,10 +174,13 @@ def test_speech_roundtrip():
         "video_link": "http://video/x.mp4",
         "session_link": "/public_oficiales/L15/CONG-1",
         "speech": [
-            {"lang": "gl", "text": "Grazas, señora presidenta.", "original": True},
-            {"lang": "es", "text": "Gracias, señora presidenta.", "original": False},
+            {"lang": "gl", "text": "Grazas, señora presidenta.", "original": True,
+             "partial": False},
+            {"lang": "es", "text": "Gracias, señora presidenta.", "original": False,
+             "partial": True},
         ],
         "original_language": "gl",
+        "split_verdict": {"method": "acoustic", "fingerprint": "abc123"},
         "mentions": [
             {"person_id": "nunez-feijoo-alberto", "person_type": "deputy",
              "name": "Núñez Feijóo, Alberto", "surface_forms": ["Feijóo"], "count": 2},
@@ -196,6 +199,9 @@ def test_speech_roundtrip():
     assert dumped["mentions"][0]["person_type"] == "deputy"
     assert dumped["mentions"][1]["person_id"] == "isabel-diaz-ayuso"
     assert dumped["entities"][0]["key"] == "eurovision"
+    # a rendering that covers only part of its original, and how the shape was decided
+    assert dumped["speech"][1]["partial"] is True
+    assert dumped["split_verdict"]["method"] == "acoustic"
 
 
 def test_speech_without_entities_defaults_empty():

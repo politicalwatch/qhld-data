@@ -20,6 +20,7 @@ class SpeechTextOut(BaseSchema):
     lang: str | None = None
     text: str | None = None
     original: bool | None = None
+    partial: bool = False
 
 
 class MentionOut(BaseSchema):
