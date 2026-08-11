@@ -530,6 +530,26 @@ def test_speeches_save_roundtrip_and_upsert(mongo_db):
     assert mongo_db.speeches.find_one({"_id": "sp1"})["speech"][0]["text"] == "new text"
 
 
+def test_speeches_save_removes_a_verdict_the_speech_no_longer_has(mongo_db):
+    # A speech the evidence could not place carries a verdict saying so. When a later
+    # extraction does place it, the verdict has to leave the document: absence is how a
+    # settled speech says it is settled, and `$set` alone can only ever add to one.
+    Speeches.save(Speech(_id="sp1", references=["R1"], speaker="Apellido, Nombre",
+                         speech=[{"lang": "ca", "text": "text", "original": True}],
+                         split_verdict={"method": "undecided", "fingerprint": "abc"}))
+    assert mongo_db.speeches.find_one({"_id": "sp1"})["split_verdict"]["method"] == \
+        "undecided"
+
+    Speeches.save(Speech(_id="sp1", references=["R1"], speaker="Apellido, Nombre",
+                         speech=[{"lang": "ca", "text": "text", "original": True}]))
+    stored = mongo_db.speeches.find_one({"_id": "sp1"})
+    assert "split_verdict" not in stored
+    # and nothing else was swept out with it
+    assert stored["speaker"] == "Apellido, Nombre"
+    assert stored["speech"][0]["lang"] == "ca"
+    assert stored["references"] == ["R1"]
+
+
 def test_speeches_save_upsert_accumulates_references(mongo_db):
     # The same intervention extracted under the first initiative of an
     # accumulated debate.

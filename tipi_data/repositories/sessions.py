@@ -18,6 +18,10 @@ class Sessions:
         update = {"$set": doc}
         if references:
             update["$addToSet"] = {"references": {"$each": references}}
+        # Inert while ``Session`` declares no ``clearable_fields``, and here so the two
+        # saves stay the one pattern they are documented as being.
+        if unset := session.to_unset():
+            update["$unset"] = dict.fromkeys(unset, "")
         return db.sessions.update_one({"_id": session.id}, update, upsert=True)
 
     @staticmethod

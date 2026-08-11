@@ -10,6 +10,8 @@ Subclasses set only the *delta* in ``model_config``; Pydantic v2 merges config a
 inheritance.
 """
 
+from typing import ClassVar
+
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,11 +46,30 @@ class DocBase(BaseModel):
     def get(self, key, default=None):
         return getattr(self, key, default)
 
+    # Fields whose ABSENCE from the document is itself the value, rather than "not
+    # known on this pass". ``to_bson`` drops every ``None``, so a repository updating
+    # with ``$set`` can add such a field and change it but never take it away again —
+    # the stored value simply survives, and the document goes on asserting something
+    # the model no longer says.
+    #
+    # It cannot default to every optional field: dropping the ``None``s is what makes a
+    # partial ``$set`` safe for a caller that only loaded part of a document, and a
+    # field can be ``None`` because it is genuinely unknown (``Speech.duration``, when
+    # the video is unpublished). So a model names the few fields it means.
+    clearable_fields: ClassVar[frozenset[str]] = frozenset()
+
     def to_bson(self):
         """BSON-ready dict for writes. ``exclude_none`` keeps the document shape
         equivalent to mongoengine, which never stored unset fields (but did store
         explicit falsy values like ``0``, ``False``, ``[]``)."""
         return self.model_dump(by_alias=True, exclude_none=True)
+
+    def to_unset(self):
+        """The ``clearable_fields`` currently unset — what a ``$set`` write has to
+        ``$unset`` alongside ``to_bson()`` to leave the document saying what this model
+        says. Empty for every model that declares none."""
+        return [name for name in self.clearable_fields
+                if getattr(self, name, None) is None]
 
 
 class DynamicEmbeddedModel(DocBase):

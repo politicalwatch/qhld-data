@@ -12,13 +12,19 @@ class Speeches:
         plain ``replace_one`` would reset the roster to the single reference of
         the current run; instead we ``$set`` the (stable) speech data and
         ``$addToSet`` the references, so the roster grows as more of the debate's
-        initiatives are extracted. Same pattern as ``Sessions.save``."""
+        initiatives are extracted. Same pattern as ``Sessions.save``.
+
+        That ``$set`` only ever adds and overwrites, so a field the speech no longer has
+        would otherwise survive in the document — see ``DocBase.clearable_fields`` for
+        the few where that absence is the value."""
         doc = speech.to_bson()
         references = doc.pop("references", [])
         doc.pop("_id", None)
         update = {"$set": doc}
         if references:
             update["$addToSet"] = {"references": {"$each": references}}
+        if unset := speech.to_unset():
+            update["$unset"] = dict.fromkeys(unset, "")
         return db.speeches.update_one({"_id": speech.id}, update, upsert=True)
 
     @staticmethod

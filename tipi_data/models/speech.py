@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from pydantic import BaseModel
 
 from tipi_data.models.base import MongoModel
@@ -126,6 +128,11 @@ class Speech(MongoModel):
     in the time available has been truncated, over-captured, or mis-split across
     languages. ``None`` where the video is unpublished or its header unreadable —
     never ``0``, which would read as an empty clip."""
+
+    # A speech that stops being undecided says so by having no verdict at all, so the
+    # field has to be removed on a re-extraction that settles it — not merely left out
+    # of the write. Nothing else here means anything by its absence.
+    clearable_fields: ClassVar[frozenset[str]] = frozenset({"split_verdict"})
 
     references: list[str] = []
     video_id: str | None = None

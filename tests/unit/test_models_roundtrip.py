@@ -254,6 +254,23 @@ def test_speech_alignment_defaults_are_insertable():
     assert "verdict" not in dumped
 
 
+def test_a_speech_that_is_no_longer_undecided_asks_for_its_verdict_to_go():
+    """``to_bson`` drops every ``None``, so a ``$set`` write alone can never take a
+    field away. A speech says which of its fields mean something by being absent."""
+    settled = Speech(_id="sp-4", speaker="Apellido, Nombre")
+    assert "split_verdict" not in settled.to_bson()
+    assert settled.to_unset() == ["split_verdict"]
+
+    undecided = Speech(_id="sp-5", speaker="Apellido, Nombre",
+                       split_verdict={"method": "undecided", "fingerprint": "abc123"})
+    assert undecided.to_unset() == []
+
+
+def test_a_model_declaring_nothing_clearable_asks_for_nothing():
+    # The default, and why the sitting's own save can carry the same clause harmlessly.
+    assert Session(_id="sess-1").to_unset() == []
+
+
 def test_the_two_tracks_of_one_speech_get_distinct_keys():
     """The whole point of the composite key: a co-official speech carries an
     as-delivered track and a Spanish one, and neither may overwrite the other."""
