@@ -174,10 +174,12 @@ def test_speech_roundtrip():
         "video_link": "http://video/x.mp4",
         "session_link": "/public_oficiales/L15/CONG-1",
         "speech": [
+            # `langs` lists every language the block is in and always opens with `lang`;
+            # the as-delivered block here also carries a Spanish quotation.
             {"lang": "gl", "text": "Grazas, señora presidenta.", "original": True,
-             "partial": False},
+             "partial": False, "langs": ["gl", "es"]},
             {"lang": "es", "text": "Gracias, señora presidenta.", "original": False,
-             "partial": True},
+             "partial": True, "langs": ["es"]},
         ],
         "original_language": "gl",
         "split_verdict": {"method": "acoustic", "fingerprint": "abc123"},

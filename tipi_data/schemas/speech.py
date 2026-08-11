@@ -21,6 +21,9 @@ class SpeechTextOut(BaseSchema):
     text: str | None = None
     original: bool | None = None
     partial: bool = False
+    # Every language the block is in, commonest first; `lang` is the first of them.
+    # Empty on speeches extracted before the field existed.
+    langs: list[str] = []
 
 
 class MentionOut(BaseSchema):

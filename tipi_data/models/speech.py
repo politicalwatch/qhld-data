@@ -18,12 +18,21 @@ class SpeechText(BaseModel):
     ``lang`` names the language the speech is *in*, not a guarantee about every sentence.
 
     ``partial`` marks a rendering that covers only part of the original. It is never set
-    on an ``original`` block, which is complete by construction."""
+    on an ``original`` block, which is complete by construction.
+
+    ``langs`` lists every language the block is actually in, commonest first, and
+    ``lang`` is always the first of them. A block that holds what was delivered holds it
+    whatever languages it mixes — a Basque passage inside a Spanish speech, a Catalan
+    paragraph carrying Spanish borrowings — and naming only the dominant one hides that
+    the others were spoken at all. Languages present only in passing (a greeting, a
+    farewell) are left out, so a Spanish speech that opens with *Bon dia* is not reported
+    as bilingual."""
 
     lang: str
     text: str
     original: bool
     partial: bool = False
+    langs: list[str] = []
 
 
 class SplitVerdict(BaseModel):
