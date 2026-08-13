@@ -1,8 +1,8 @@
 """Where each subtitle line of a speech falls in its video.
 
-**One document per speech and language**, keyed by ``f"{speech_id}:{lang}"``. Produced
-by forced alignment of the Diario transcript against the intervention's own video cut,
-so the words are the stenographers' and only the timing comes from a model.
+**One document per block of a speech**, keyed by ``f"{speech_id}:{lang}:{role}"``.
+Produced by forced alignment of the Diario transcript against the intervention's own
+video cut, so the words are the stenographers' and only the timing comes from a model.
 
 Two things are deliberately *not* stored. There is no subtitle text: a cue carries
 character offsets into the speech block it was aligned against, and the text is
@@ -19,13 +19,18 @@ that it finds the right one — measured at a median error of 0 ms against the
 as-delivered track on shared anchors. That matters because most readers only read
 Spanish, so without this a Galician intervention would offer them a Galician track.
 
-Why per-language documents rather than one document holding several tracks: a track
-is derived wholly from one audio file and one block of text, so re-aligning one
-language must supersede exactly that language and leave its sibling untouched — which
-is what the whole-document ``replace_one`` in the repository expresses. The composite
-key also keeps every read a lookup by ``_id``: a caller knows the candidate languages
-from ``Speech.speech[].lang``, so "which tracks does this speech have" is an ``$in``
-over at most a couple of ids and still needs no index.
+Why per-block documents rather than one document holding several tracks: a track is
+derived wholly from one audio file and one block of text, so re-aligning one block must
+supersede exactly that block and leave its sibling untouched — which is what the
+whole-document ``replace_one`` in the repository expresses. The composite key also keeps
+every read a lookup by ``_id``: a caller knows a speech's blocks from ``Speech.speech``,
+so "which tracks does this speech have" is an ``$in`` over at most a couple of ids and
+still needs no index.
+
+**The language alone does not identify a block.** A speech mostly given in Spanish, one
+passage of which the Diario also printed in Spanish, has two blocks that are both ``es``
+— what separates them is the role each plays, which is exactly what ``original`` records.
+So the key names both, and a track is asked for as a language *and* a role.
 """
 
 from datetime import datetime, timezone
@@ -35,14 +40,19 @@ from pydantic import BaseModel, Field
 from tipi_data.models.base import MongoModel
 
 
-def track_id(speech_id, lang):
-    """The ``_id`` of one speech's track in one language.
+def track_id(speech_id, lang, original=True):
+    """The ``_id`` of one speech's track for one block.
 
     A function rather than an f-string at each call site because the writer and every
     reader have to agree on it exactly, the same reason the text fingerprint is taken
     through one function on both ends of its guard.
+
+    ``original`` is the block's own flag: what was delivered, or the Diario's rendering
+    of it. It is part of the key because a language is not enough to tell two blocks
+    apart — see the note above — and it is spelled out rather than encoded as a flag so
+    an id read in the shell says what it is.
     """
-    return f"{speech_id}:{lang}"
+    return f"{speech_id}:{lang}:{'original' if original else 'translation'}"
 
 
 class Cue(BaseModel):

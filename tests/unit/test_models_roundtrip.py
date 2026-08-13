@@ -215,7 +215,7 @@ def test_speech_without_entities_defaults_empty():
 
 def test_speech_alignment_roundtrip():
     doc = {
-        "_id": "sp-1:gl",
+        "_id": "sp-1:gl:original",
         "speech_id": "sp-1",
         "lang": "gl",
         "block_index": 0,
@@ -235,7 +235,7 @@ def test_speech_alignment_roundtrip():
         "created_at": datetime(2026, 8, 6, 21, 9, 0),
     }
     dumped = assert_reproduces(SpeechAlignment, doc)
-    assert dumped["_id"] == "sp-1:gl"
+    assert dumped["_id"] == "sp-1:gl:original"
     assert "id" not in dumped  # dumped by alias only
     assert dumped["cues"][1]["start_ms"] == 16357
 
@@ -245,7 +245,7 @@ def test_speech_alignment_defaults_are_insertable():
         _id=track_id("sp-2", "es"), speech_id="sp-2", lang="es", block_index=0,
         text_sha256="c" * 64, text_length=9693)
     dumped = alignment.to_bson()
-    assert dumped["_id"] == "sp-2:es"
+    assert dumped["_id"] == "sp-2:es:original"
     assert dumped["cues"] == []
     assert isinstance(dumped["created_at"], datetime)
     # A track is as-delivered unless it says otherwise: the plain case is a speech
@@ -278,6 +278,15 @@ def test_the_two_tracks_of_one_speech_get_distinct_keys():
     as-delivered track and a Spanish one, and neither may overwrite the other."""
     assert track_id("sp-3", "gl") != track_id("sp-3", "es")
     assert track_id("sp-3", "gl").startswith("sp-3")
+
+
+def test_two_blocks_of_the_same_language_get_distinct_keys():
+    """Why the role is in the key at all, and not only the language. A speech given
+    mostly in Spanish, one passage of which the Diario also printed in Spanish, has two
+    blocks that are both ``es`` — keyed on language alone, one track would silently
+    overwrite the other and the page would caption a speech with its own translation."""
+    assert track_id("sp-4", "es", True) != track_id("sp-4", "es", False)
+    assert track_id("sp-4", "es") == track_id("sp-4", "es", True)
 
 
 def test_search_rating_roundtrip():

@@ -648,7 +648,7 @@ def test_speeches_distinct_nondeputy_speakers(mongo_db):
 
 def _alignment(speech_id="sp1", lang="gl", cues=2, original=True, block_index=0):
     return SpeechAlignment(
-        _id=track_id(speech_id, lang), speech_id=speech_id, lang=lang,
+        _id=track_id(speech_id, lang, original), speech_id=speech_id, lang=lang,
         block_index=block_index, original=original,
         text_sha256="a" * 64, text_length=10424,
         cues=[{"start_ms": 1000 * i, "end_ms": 1000 * i + 900,
@@ -685,8 +685,8 @@ def test_re_aligning_one_language_leaves_its_sibling_alone(mongo_db):
 
     assert mongo_db.speech_alignments.count_documents({}) == 2
     assert len(SpeechAlignments.get("sp1", "gl").cues) == 148
-    assert len(SpeechAlignments.get("sp1", "es").cues) == 160
-    assert SpeechAlignments.get("sp1", "es").original is False
+    assert len(SpeechAlignments.get("sp1", "es", original=False).cues) == 160
+    assert SpeechAlignments.get("sp1", "es", original=False).original is False
 
 
 def test_speech_alignments_summary_leaves_the_cues_behind(mongo_db):
@@ -705,20 +705,38 @@ def test_speech_alignments_summary_leaves_the_cues_behind(mongo_db):
     assert SpeechAlignments.summary("sp1", "es") is None
 
 
+def test_the_two_spanish_blocks_of_one_speech_keep_separate_tracks(mongo_db):
+    """The keying this exists for. A speech given mostly in Spanish, one passage of
+    which the Diario also printed in Spanish, has two blocks of the SAME language: the
+    one that was spoken and the one that renders that passage. Keyed on language alone
+    the second would overwrite the first, and the page would caption the speech with
+    its own translation."""
+    SpeechAlignments.save(_alignment(lang="es", cues=140, original=True))
+    SpeechAlignments.save(
+        _alignment(lang="es", cues=151, original=False, block_index=1))
+
+    assert mongo_db.speech_alignments.count_documents({}) == 2
+    assert len(SpeechAlignments.get("sp1", "es").cues) == 140
+    assert len(SpeechAlignments.get("sp1", "es", original=False).cues) == 151
+    assert [s["original"] for s in SpeechAlignments.summaries(
+        "sp1", [("es", True), ("es", False)])] == [True, False]
+
+
 def test_summaries_answers_for_every_language_at_once(mongo_db):
     SpeechAlignments.save(_alignment(lang="gl", cues=148))
     SpeechAlignments.save(
         _alignment(lang="es", cues=151, original=False, block_index=1))
 
-    summaries = SpeechAlignments.summaries("sp1", ["gl", "es"])
+    summaries = SpeechAlignments.summaries("sp1", [("gl", True), ("es", False)])
 
     # In the order asked for, so the caller controls which track a page offers first.
     assert [s["lang"] for s in summaries] == ["gl", "es"]
     assert all("cues" not in s for s in summaries)
     # A language with no track is simply absent — that is how the caller learns.
-    assert [s["lang"] for s in SpeechAlignments.summaries("sp1", ["eu", "es"])] == ["es"]
+    assert [s["lang"] for s in SpeechAlignments.summaries(
+        "sp1", [("eu", True), ("es", False)])] == ["es"]
     assert SpeechAlignments.summaries("sp1", []) == []
-    assert SpeechAlignments.summaries("missing", ["gl", "es"]) == []
+    assert SpeechAlignments.summaries("missing", [("gl", True), ("es", False)]) == []
 
 
 def test_delete_all_drops_every_track_of_one_speech_only(mongo_db):
@@ -726,7 +744,7 @@ def test_delete_all_drops_every_track_of_one_speech_only(mongo_db):
     SpeechAlignments.save(_alignment(lang="es", original=False, block_index=1))
     SpeechAlignments.save(_alignment(speech_id="sp2", lang="es"))
 
-    SpeechAlignments.delete_all("sp1", ["gl", "es"])
+    SpeechAlignments.delete_all("sp1", [("gl", True), ("es", False)])
 
     assert mongo_db.speech_alignments.count_documents({}) == 1
     assert SpeechAlignments.exists("sp2", "es")
