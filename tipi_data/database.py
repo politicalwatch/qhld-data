@@ -62,8 +62,8 @@ _INDEXES = {
     # Newest-first: every read of this collection is "what have users said lately".
     "search_ratings": [([("created_at", DESCENDING)], {})],
     # The unique one is the upsert key, not just an optimisation: it is what makes one
-    # document per gap true even when two searches race to create the same one.
-    "query_gaps": [
+    # document per finding true even when two searches race to create the same one.
+    "search_diagnostics": [
         ([("field", ASCENDING), ("key", ASCENDING), ("outcome", ASCENDING)],
          {"unique": True}),
         ([("last_seen", DESCENDING)], {}),

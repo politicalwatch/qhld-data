@@ -1,7 +1,11 @@
 from pymongo.errors import DuplicateKeyError
 
 from tipi_data import db
-from tipi_data.models.query_gap import QueryGap, QueryGapEvent
+from tipi_data.models.search_diagnostic import (
+    REFUSED_PREFIX,
+    SearchDiagnostic,
+    SearchDiagnosticEvent,
+)
 
 
 # How many verbatim sightings a document keeps. Pushed with a NEGATIVE $slice, so these
@@ -10,15 +14,20 @@ from tipi_data.models.query_gap import QueryGap, QueryGapEvent
 EXAMPLES_KEPT = 5
 
 
-class QueryGaps:
+class SearchDiagnostics:
     @staticmethod
-    def record(event: QueryGapEvent):
+    def record(event: SearchDiagnosticEvent):
         """Fold one sighting into its ``(field, key, outcome)`` document.
 
         An upsert with counters rather than an append-only insert: a popular gap must not
         cost more storage than a rare one, and the counts are the artifact a curation
         round actually reads. The document therefore stays a fixed size — the arrays are
         sets or capped — no matter how many times the gap is seen.
+
+        The same shape carries a refused query, whose key is the normalised query text
+        instead of a value inside it. That is what makes repeated probing legible: a
+        thousand identical refusals are one document with ``count: 1000``, not a
+        thousand documents an attacker chose the number of.
         """
         month = event.at.strftime("%Y-%m")
         add_to_set = {
@@ -32,12 +41,17 @@ class QueryGaps:
             add_to_set["chosen"] = event.chosen
         if event.tied:
             add_to_set["tied"] = {"$each": event.tied}
+        if event.language is not None:
+            add_to_set["languages"] = event.language
         update = {
             "$setOnInsert": {"first_seen": event.at},
             "$set": {"last_seen": event.at},
             "$inc": {
                 "count": 1,
                 "blocking_count": 1 if event.blocking else 0,
+                # The only interpolated field path here, and it is built from the event's
+                # own timestamp. Never build one from the key or the query: those carry
+                # whatever a caller typed.
                 f"counts_by_month.{month}": 1,
             },
             "$addToSet": add_to_set,
@@ -49,6 +63,7 @@ class QueryGaps:
                         "filters": event.filters,
                         "value": event.value,
                         "suggestion": event.suggestion,
+                        "language": event.language,
                         "parser_model": event.parser_model,
                         "at": event.at,
                     }],
@@ -58,21 +73,35 @@ class QueryGaps:
         }
         key = {"field": event.field, "key": event.key, "outcome": event.outcome}
         try:
-            return db.query_gaps.update_one(key, update, upsert=True)
+            return db.search_diagnostics.update_one(key, update, upsert=True)
         except DuplicateKeyError:
-            # Two searches raced to create the same brand-new gap and the unique index
+            # Two searches raced to create the same brand-new record and the unique index
             # rejected the loser. The document now exists, so the same update applies
             # cleanly; retried once so a race costs nothing rather than silently dropping
             # an observation from the counts.
-            return db.query_gaps.update_one(key, update, upsert=True)
+            return db.search_diagnostics.update_one(key, update, upsert=True)
 
     @staticmethod
     def get_all():
-        """Every gap, worst first: the ones that returned nothing to the most people."""
-        return [QueryGap.model_validate(doc) for doc in
-                db.query_gaps.find().sort([("blocking_count", -1), ("count", -1)])]
+        """Everything, worst first: the ones that returned nothing to the most people."""
+        return [SearchDiagnostic.model_validate(doc) for doc in
+                db.search_diagnostics.find().sort([("blocking_count", -1), ("count", -1)])]
 
     @staticmethod
     def by_field(field):
-        return [QueryGap.model_validate(doc) for doc in
-                db.query_gaps.find({"field": field}).sort("count", -1)]
+        return [SearchDiagnostic.model_validate(doc) for doc in
+                db.search_diagnostics.find({"field": field}).sort("count", -1)]
+
+    @staticmethod
+    def refusals():
+        """Only the refused queries, most repeated first.
+
+        Its own reader because these rows are the ones to be careful with — the text in
+        them was written to get past a gate — and because they answer a different
+        question from the rest: not "what is missing from our catalogs" but "what are the
+        gates turning away, and is any of it legitimate".
+        """
+        return [SearchDiagnostic.model_validate(doc) for doc in
+                db.search_diagnostics
+                .find({"outcome": {"$regex": f"^{REFUSED_PREFIX}"}})
+                .sort("count", -1)]
