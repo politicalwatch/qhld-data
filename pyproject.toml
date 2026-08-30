@@ -6,7 +6,7 @@ authors = [{ name = "pr3ssh" }]
 requires-python = ">=3.12"
 
 dependencies = [
-    "pydantic==2.13.4",
+    "pydantic==2.13.5",
     "pymongo==4.17.0",
     "regex==2026.7.19",
     "python-slugify==8.0.4",
@@ -15,7 +15,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest==9.1.1",
-    "testcontainers[mongodb]==4.14.2",
+    "testcontainers[mongodb]==4.15.0",
 ]
 
 [tool.pytest.ini_options]
