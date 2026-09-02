@@ -60,7 +60,9 @@ class InitiativeAlerts():
 
     @staticmethod
     def clear():
-        db.initiatives_alerts.drop()
+        # Emptied, not dropped: dropping takes the text index with it and nothing
+        # recreates it before the next run — ``ensure_indexes()`` runs only on import.
+        return db.initiatives_alerts.delete_many({})
 
     @staticmethod
     def by_search(search, kb, exclude_fields=None):

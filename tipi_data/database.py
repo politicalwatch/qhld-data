@@ -42,6 +42,11 @@ _INDEXES = {
         ([("reference", ASCENDING)], {}),
         ([("updated", ASCENDING)], {}),
     ],
+    # The alert sender queries this collection, so a saved search on ``text`` needs the
+    # index here too.
+    "initiatives_alerts": [
+        ([("title", TEXT), ("content", TEXT)], {"default_language": "spanish"}),
+    ],
     "deputies": [([("name", ASCENDING)], {})],
     "topics": [([("name", ASCENDING)], {})],
     "places": [([("name", ASCENDING)], {})],
