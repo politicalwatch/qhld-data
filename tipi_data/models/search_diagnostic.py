@@ -35,8 +35,9 @@ future reader:
    reach a prompt as anything but quoted data.
 2. **Escape before rendering.** No review UI exists yet. Whoever builds one inherits this.
 3. **Values only, never field paths.** The stored text goes into a query as a value. The
-   one interpolated path in the repository, ``counts_by_month.<YYYY-MM>``, is derived from
-   a timestamp and never from user input — keep it that way.
+   two interpolated paths in the repository, ``counts_by_month.<YYYY-MM>`` and
+   ``refused_by_counts.<layer>``, are derived from a timestamp and from a closed set of
+   values the model enforces, never from user input — keep it that way.
 
 Stored text is sanitised and truncated on the way in (see ``_clean``), which is what keeps
 a terminal review session safe from escape sequences the writer never chose.
@@ -44,6 +45,7 @@ a terminal review session safe from escape sequences the writer never chose.
 
 import re
 from datetime import datetime, timezone
+from typing import Literal
 
 from bson import ObjectId
 from pydantic import ConfigDict, Field, field_validator
@@ -158,6 +160,15 @@ class SearchDiagnosticEvent(DocBase):
     # Which parser produced this reading. An empty string is a legitimate value meaning
     # "no model was pinned, the provider default decided" — not missing data.
     parser_model: str | None = None
+    # Refusals only: which layer turned the query away — the intent gate that runs before
+    # the parser, or the parser's own gate. Both give the user the same answer, but a
+    # refusal by the intent gate never paid for a parse, so the split is what tells you
+    # what the refusals are costing. A closed set because the repository builds a field
+    # path from it.
+    refused_by: Literal["intent_gate", "parser"] | None = None
+    # The decision model behind the intent gate, when one was running. Present on a
+    # parser refusal too: it says which gate model let the query through.
+    gate_model: str | None = None
     at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Sanitising here rather than at the call site so it cannot be skipped: every writer
@@ -206,6 +217,8 @@ class SearchDiagnostic(DocBase):
     chosen: list[str] = Field(default_factory=list)
     tied: list[str] = Field(default_factory=list)
     languages: list[str] = Field(default_factory=list)
+    refused_by_counts: dict = Field(default_factory=dict)
+    gate_models: list[str] = Field(default_factory=list)
     examples: list[dict] = Field(default_factory=list)
     first_seen: datetime | None = None
     last_seen: datetime | None = None

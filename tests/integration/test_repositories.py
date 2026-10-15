@@ -946,6 +946,22 @@ def test_repeated_refusals_of_one_query_stay_one_document(mongo_db):
     assert refusal.refused
 
 
+def test_refusals_are_counted_by_the_layer_that_refused_them(mongo_db):
+    for _ in range(2):
+        SearchDiagnostics.record(_refusal_event(refused_by="intent_gate",
+                                                gate_model="jev-1.13.0"))
+    SearchDiagnostics.record(_refusal_event(refused_by="parser", gate_model="jev-1.13.0"))
+    SearchDiagnostics.record(_refusal_event())   # written before the field existed
+
+    # One document per refused query still; the split inside it is what tells a cheap
+    # refusal from one that paid for a parse.
+    refusal = SearchDiagnostics.refusals()[0]
+    assert refusal.count == 4
+    assert refusal.refused_by_counts == {"intent_gate": 2, "parser": 1}
+    assert refusal.gate_models == ["jev-1.13.0"]
+    assert refusal.examples[-2]["refused_by"] == "parser"
+
+
 def test_the_two_gates_are_counted_apart(mongo_db):
     SearchDiagnostics.record(_refusal_event())
     SearchDiagnostics.record(_refusal_event(

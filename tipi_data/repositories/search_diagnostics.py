@@ -43,15 +43,17 @@ class SearchDiagnostics:
             add_to_set["tied"] = {"$each": event.tied}
         if event.language is not None:
             add_to_set["languages"] = event.language
+        if event.gate_model is not None:
+            add_to_set["gate_models"] = event.gate_model
         update = {
             "$setOnInsert": {"first_seen": event.at},
             "$set": {"last_seen": event.at},
             "$inc": {
                 "count": 1,
                 "blocking_count": 1 if event.blocking else 0,
-                # The only interpolated field path here, and it is built from the event's
-                # own timestamp. Never build one from the key or the query: those carry
-                # whatever a caller typed.
+                # An interpolated field path, built from the event's own timestamp.
+                # Never build one from the key or the query: those carry whatever a
+                # caller typed.
                 f"counts_by_month.{month}": 1,
             },
             "$addToSet": add_to_set,
@@ -65,12 +67,18 @@ class SearchDiagnostics:
                         "suggestion": event.suggestion,
                         "language": event.language,
                         "parser_model": event.parser_model,
+                        "refused_by": event.refused_by,
+                        "gate_model": event.gate_model,
                         "at": event.at,
                     }],
                     "$slice": -EXAMPLES_KEPT,
                 }
             },
         }
+        if event.refused_by is not None:
+            # The other interpolated path: ``refused_by`` is a closed set the model
+            # validates, so it can never carry text a caller chose.
+            update["$inc"][f"refused_by_counts.{event.refused_by}"] = 1
         key = {"field": event.field, "key": event.key, "outcome": event.outcome}
         try:
             return db.search_diagnostics.update_one(key, update, upsert=True)

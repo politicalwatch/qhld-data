@@ -379,6 +379,17 @@ def test_search_diagnostic_event_is_strict():
                               value="Rueda", query="x", sugestion="typo")
 
 
+def test_search_diagnostic_event_accepts_only_known_refusal_layers():
+    # The repository turns ``refused_by`` into a field path, so it must never carry
+    # anything but one of the two layers.
+    for layer in ("intent_gate", "parser", None):
+        SearchDiagnosticEvent(field="query", key="x", outcome="refused_not_a_speech_search",
+                              value="x", query="x", refused_by=layer)
+    with pytest.raises(ValidationError):
+        SearchDiagnosticEvent(field="query", key="x", outcome="refused_not_a_speech_search",
+                              value="x", query="x", refused_by="$where")
+
+
 def test_search_diagnostic_event_strips_control_characters():
     # A refused query is attacker-supplied by definition — that outcome exists to catch
     # exactly this — and it is read back in a terminal. An escape sequence that survived
